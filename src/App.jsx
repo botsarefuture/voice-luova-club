@@ -1457,6 +1457,30 @@ export default function App() {
             </div>
           </section>
 
+          {practiceStyle === "guided" && <section className="range-map guided-range-map guided-live-map" aria-label="Live pitch map">
+            <div className="range-map-heading">
+              <div>
+                <p className="eyebrow">Live pitch map</p>
+                <h3>See your voice and the next note together.</h3>
+              </div>
+              <span>{currentMidi === null ? "Waiting for sound" : `You: ${gentleDisplay ? "sound heard" : midiToNoteName(currentMidi)}`}</span>
+            </div>
+            <div className="range-live-track" style={{ "--range-position": `${visualRangePosition}%`, "--range-low": `${Math.min(visualRangeLow, visualRangeHigh)}%`, "--range-width": `${Math.max(1.2, Math.abs(visualRangeHigh - visualRangeLow))}%` }} aria-label={currentMidi === null ? "Waiting for a steady voice sound" : `Live pitch: ${gentleDisplay ? "detected" : midiToNoteName(currentMidi)}`}>
+              <i className="range-track-blue" />
+              <i className="range-track-gray" />
+              <i className="range-track-pink" />
+              {(dailySession.lowMidi !== null || dailySession.highMidi !== null) && <i className="range-today-window" />}
+              <span className={currentMidi === null ? "range-live-dot waiting" : "range-live-dot"} />
+            </div>
+            <div className="range-map-legend">
+              <span className="range-band blue"><b>{gentleDisplay ? "Lower" : "C3 - C#3"}</b> Lower reference</span>
+              <span className="range-band gray"><b>{gentleDisplay ? "Middle" : "D3 - F3"}</b> Everyday reference</span>
+              <span className="range-band pink"><b>{gentleDisplay ? "Lighter" : "F#3 - C#4"}</b> Light exploration</span>
+              {showExtendedRange && <span className="range-band violet"><b>{gentleDisplay ? "Extended" : "D4 - F5"}</b> Optional exploration</span>}
+            </div>
+            <p>Your dot is your live pitch. The pale window is the steady area FemmeVoice has heard today. Your current target is {gentleDisplay ? "the next gentle reference" : midiToNoteName(targetMidi)}.</p>
+          </section>}
+
           {activeStep === "warmup" ? (
             <div className="hum-circuit" aria-label="Guided humming warmup">
               <div className="hum-circuit-heading">
@@ -1519,7 +1543,7 @@ export default function App() {
 
           {practiceStyle === "free" && <canvas ref={canvasRef} width="980" height="340" aria-label="Pitch trace against the exercise target" />}
 
-          <div className={practiceStyle === "guided" ? "range-map guided-range-map" : "range-map"} aria-label="Pitch reference range map">
+          {practiceStyle === "free" && <div className="range-map" aria-label="Pitch reference range map">
             <div className="range-map-heading">
               <div>
                 <p className="eyebrow">{practiceStyle === "guided" ? "Your pitch map" : "Pitch reference map"}</p>
@@ -1541,7 +1565,7 @@ export default function App() {
               {showExtendedRange && <span className="range-band violet"><b>{gentleDisplay ? "Extended" : "D4 - F5"}</b> Optional exploration</span>}
             </div>
             <p>{practiceStyle === "guided" ? "The dot moves when FemmeVoice hears a steady sound. No colour is better than another; this just shows where your voice is today." : "Every voice has its own comfortable range. These bands are a visual guide for exploration, not a promise about what you should sound like or reach."}</p>
-          </div>
+          </div>}
 
           <div className="micro-drills" aria-label={`${activePractice.label} practice prompts`}>
             {activeStageExercise.cards.map((card, index) => (
