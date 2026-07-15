@@ -288,6 +288,7 @@ export default function App() {
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [resourceFilter, setResourceFilter] = useState("start");
   const [showExtendedRange, setShowExtendedRange] = useState(() => loadProgress().showExtendedRange ?? false);
+  const [gentleDisplay, setGentleDisplay] = useState(() => loadProgress().gentleDisplay ?? false);
 
   const audioRef = useRef(null);
   const canvasRef = useRef(null);
@@ -374,6 +375,7 @@ export default function App() {
       practiceTier,
       comfortAnchorMidi,
       showExtendedRange,
+      gentleDisplay,
     }));
   }, [dailySession]);
 
@@ -385,8 +387,9 @@ export default function App() {
       practiceTier,
       comfortAnchorMidi,
       showExtendedRange,
+      gentleDisplay,
     }));
-  }, [targetIndex, activeStep, exerciseMode, practiceTier, comfortAnchorMidi, showExtendedRange]);
+  }, [targetIndex, activeStep, exerciseMode, practiceTier, comfortAnchorMidi, showExtendedRange, gentleDisplay]);
 
   useEffect(() => {
     saveProgress(progress);
@@ -418,6 +421,7 @@ export default function App() {
           setPracticeTier(merged.practiceTier ?? "starter");
           setComfortAnchorMidi(merged.comfortAnchorMidi ?? null);
           setShowExtendedRange(merged.showExtendedRange ?? false);
+          setGentleDisplay(merged.gentleDisplay ?? false);
         }
         setSyncStatus("synced");
       })
@@ -973,10 +977,10 @@ export default function App() {
       {micError && <p className="alert">{micError}</p>}
 
       <section className="metrics-grid" aria-label="Daily voice metrics">
-        <Metric icon={<Music2 />} label="Detected now" value={current.frequency ? midiToNoteName(currentMidi) : "--"} detail={formatFrequency(current.frequency)} />
-        <Metric icon={<Gauge />} label="Comfort range today" value={formatRange(dailySession.lowMidi, dailySession.highMidi)} detail={`${semitoneSpan(dailySession.lowMidi, dailySession.highMidi)} sustained semitones mapped`} />
-        <Metric icon={<Activity />} label="Stability" value={`${sessionStats.stability}%`} detail={`${sessionStats.stabilityLabel} pitch hold`} />
-        <Metric icon={<HeartPulse />} label="Effort signal" value={sessionStats.effortLabel} detail={`Mic level ${Math.round(current.volume * 1000)}`} />
+        <Metric icon={<Music2 />} label="Detected now" value={gentleDisplay ? (current.frequency ? "Sound heard" : "Listening") : current.frequency ? midiToNoteName(currentMidi) : "--"} detail={gentleDisplay ? "No note labels in gentle display" : formatFrequency(current.frequency)} />
+        <Metric icon={<Gauge />} label="Comfort range today" value={gentleDisplay ? (dailySession.highMidi === null ? "Still mapping" : "Gently mapped") : formatRange(dailySession.lowMidi, dailySession.highMidi)} detail={gentleDisplay ? "Only sustained, easy sounds count" : `${semitoneSpan(dailySession.lowMidi, dailySession.highMidi)} sustained semitones mapped`} />
+        <Metric icon={<Activity />} label="Steadiness" value={gentleDisplay ? sessionStats.stabilityLabel : `${sessionStats.stability}%`} detail={gentleDisplay ? "A soft hold is enough" : "Pitch hold"} />
+        <Metric icon={<HeartPulse />} label="Mic level" value={gentleDisplay ? (current.volume > 0.12 ? "Clear" : "Soft") : sessionStats.effortLabel} detail="Volume is not vocal effort" />
       </section>
 
       <section className="practice-tier-panel" aria-label="Practice tier and rest guidance">
@@ -1054,7 +1058,7 @@ export default function App() {
               <p>{activePractice.prompt}</p>
             </div>
             <span className={Math.abs(currentCents ?? 999) <= 55 ? "status good" : "status"}>
-              {currentCents === null ? "Waiting" : `${currentCents > 0 ? "+" : ""}${currentCents} cents`}
+              {gentleDisplay ? currentCents === null ? "Waiting" : Math.abs(currentCents) <= 55 ? "In your zone" : "Adjust gently" : currentCents === null ? "Waiting" : `${currentCents > 0 ? "+" : ""}${currentCents} cents`}
             </span>
           </div>
 
@@ -1068,9 +1072,9 @@ export default function App() {
               </select>
             </label>
             <div className="target-chip">
-              <span>Target</span>
-              <strong>{midiToNoteName(targetMidi)}</strong>
-              <small>{Math.round(targetFrequency)} Hz</small>
+              <span>{gentleDisplay ? "Reference" : "Target"}</span>
+              <strong>{gentleDisplay ? "Easy next step" : midiToNoteName(targetMidi)}</strong>
+              <small>{gentleDisplay ? "Follow the tone by ear" : `${Math.round(targetFrequency)} Hz`}</small>
             </div>
             <button
               className="icon-action"
@@ -1203,13 +1207,13 @@ export default function App() {
                 <p className="eyebrow">Pitch reference map</p>
                 <h3>Use the colours to orient yourself, not to grade yourself.</h3>
               </div>
-              <span>{showExtendedRange ? "C3 - F5" : "C3 - C#4"}</span>
+              <span>{gentleDisplay ? "Your own map" : showExtendedRange ? "C3 - F5" : "C3 - C#4"}</span>
             </div>
             <div className="range-map-legend">
-              <span className="range-band blue"><b>C3 - C#3</b> Lower / masc-coded reference</span>
-              <span className="range-band gray"><b>D3 - F3</b> Neutral reference</span>
-              <span className="range-band pink"><b>F#3 - C#4</b> Bright reference</span>
-              {showExtendedRange && <span className="range-band violet"><b>D4 - F5</b> Extended exploration</span>}
+              <span className="range-band blue"><b>{gentleDisplay ? "Lower" : "C3 - C#3"}</b> Lower reference</span>
+              <span className="range-band gray"><b>{gentleDisplay ? "Middle" : "D3 - F3"}</b> Everyday reference</span>
+              <span className="range-band pink"><b>{gentleDisplay ? "Lighter" : "F#3 - C#4"}</b> Light exploration</span>
+              {showExtendedRange && <span className="range-band violet"><b>{gentleDisplay ? "Extended" : "D4 - F5"}</b> Optional exploration</span>}
             </div>
             <p>Every voice has its own comfortable range. These bands are a visual guide for exploration, not a promise about what you should sound like or reach.</p>
           </div>
@@ -1223,13 +1227,13 @@ export default function App() {
           {lastScore && (
             <div className="score-card">
               <div className="score-ring" style={{ "--score": `${lastScore.score * 3.6}deg` }}>
-                <strong>{lastScore.score}</strong>
-                <span>/100</span>
+                <strong>{gentleDisplay ? "~" : lastScore.score}</strong>
+                <span>{gentleDisplay ? "check" : "/100"}</span>
               </div>
               <div>
                 <h3>{lastScore.label}</h3>
                 <p>
-                  {lastScore.cents !== null
+                  {gentleDisplay ? "A gentle check of steadiness and closeness. Keep only the part that felt easy." : lastScore.cents !== null
                     ? `${lastScore.cents > 0 ? "+" : ""}${lastScore.cents} cents average on ${lastScore.targetNote}.`
                     : "Try a longer, steadier sound so the coach has enough data."}
                 </p>
@@ -1252,7 +1256,7 @@ export default function App() {
             <Readout label="Goal" value={activePractice.target} />
             <Readout label="Tier" value={`${activeTier.label} ${activeTier.minutes} min`} />
             <Readout label="Session" value={`${dailySession.attempts.length} scored repeats`} />
-            <Readout label="Remembered target" value={midiToNoteName(rememberedTargetMidi)} />
+            <Readout label="Remembered target" value={gentleDisplay ? "Your last easy step" : midiToNoteName(rememberedTargetMidi)} />
           </div>
 
           <div className="lesson-card">
@@ -1308,7 +1312,7 @@ export default function App() {
       <section className="progress-dashboard" aria-label="Progress over time">
         <div className="progress-summary">
           <p className="eyebrow">Progress memory</p>
-          <h2>Last time you reached {midiToNoteName(rememberedTargetMidi)} in {MODE_LABELS[progress.lastMode]}.</h2>
+          <h2>{gentleDisplay ? `Your last saved practice step was ${MODE_LABELS[progress.lastMode]}.` : `Last time you reached ${midiToNoteName(rememberedTargetMidi)} in ${MODE_LABELS[progress.lastMode]}.`}</h2>
           <p>
             Best saved range: {formatRange(progress.bestLowMidi, progress.bestHighMidi)}.
             {progress.bestScore !== null ? ` Best scored repeat: ${progress.bestScore}/100 on ${progress.bestScoreNote}.` : "Score a repeat to begin your history."}
@@ -1429,6 +1433,11 @@ export default function App() {
             <input type="checkbox" checked={showExtendedRange} onChange={(event) => setShowExtendedRange(event.target.checked)} />
             <span aria-hidden="true" />
             <strong>Show extended upper range to F5</strong>
+          </label>
+          <label className="setting-toggle">
+            <input type="checkbox" checked={gentleDisplay} onChange={(event) => setGentleDisplay(event.target.checked)} />
+            <span aria-hidden="true" />
+            <strong>Gentle display: hide note names, Hz, cents, and scores</strong>
           </label>
           <button className="account-link" onClick={recalibrateComfortAnchor}>Recalibrate from my easy hum</button>
           <p>The next steady hum becomes your starting anchor. No preset pitch is required.</p>

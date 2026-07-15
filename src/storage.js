@@ -90,6 +90,7 @@ export function mergeTodayIntoProgress(progress, session, preferences) {
     practiceTier: preferences.practiceTier ?? normalized.practiceTier,
     comfortAnchorMidi: preferences.comfortAnchorMidi ?? normalized.comfortAnchorMidi,
     showExtendedRange: preferences.showExtendedRange ?? normalized.showExtendedRange,
+    gentleDisplay: preferences.gentleDisplay ?? normalized.gentleDisplay,
     totalAttempts: days.reduce((sum, day) => sum + day.attempts, 0),
     totalPracticeDays: days.length,
   });
@@ -110,6 +111,7 @@ function defaultProgress() {
     practiceTier: "starter",
     comfortAnchorMidi: null,
     showExtendedRange: false,
+    gentleDisplay: false,
     totalAttempts: 0,
     totalPracticeDays: 0,
   };
@@ -149,6 +151,7 @@ export function mergeProgressRecords(primary, secondary) {
     bestScoreNote: bestScoreSource.bestScoreNote,
     highestPassedIndex: Math.max(first.highestPassedIndex ?? 0, second.highestPassedIndex ?? 0),
     showExtendedRange: Boolean(first.showExtendedRange || second.showExtendedRange),
+    gentleDisplay: Boolean(first.gentleDisplay || second.gentleDisplay),
     totalAttempts: days.reduce((sum, day) => sum + (day.attempts ?? 0), 0),
     totalPracticeDays: days.length,
   });
