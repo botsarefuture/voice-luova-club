@@ -50,6 +50,7 @@ import {
   saveTodaySession,
 } from "./storage";
 import { decryptRecording, deriveRecordingKey, encryptRecording } from "./recordings";
+import { APP_VERSION } from "./version";
 
 const EXERCISE_STEPS = [0, 1, 2, 3, 5, 7, 8, 10, 12];
 const DEFAULT_COMFORT_ANCHOR = 52;
@@ -1652,6 +1653,8 @@ export default function App() {
           <article><b>3</b><strong>Use it</strong><span>Carry one comfortable change into a short phrase or ordinary conversation.</span></article>
         </div>
 
+        <a className="community-link" href="https://discord.gg/Vh5N2WEJtU" target="_blank" rel="noreferrer"><MessageCircle /><span><strong>FemmeVoice community</strong><small>Ask questions, share what you are learning, and help shape the app.</small></span><ExternalLink /></a>
+
         <div className="resource-filter" role="tablist" aria-label="Resource topics">
           {RESOURCE_FILTERS.map((filter) => (
             <button
@@ -1789,6 +1792,7 @@ export default function App() {
       </section>
 
       <button className="account-link privacy-link" onClick={() => navigateTo("privacy")}>Read the full privacy policy</button>
+      <p className="app-version">FemmeVoice v{APP_VERSION}</p>
       </>}
 
       {activeView === "privacy" && <section className="privacy-page" aria-label="FemmeVoice privacy policy">

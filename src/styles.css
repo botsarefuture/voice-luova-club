@@ -1653,6 +1653,12 @@ canvas {
   margin: 18px 0;
 }
 
+.community-link { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 11px; align-items: center; margin: 0 0 18px; border: 1px solid rgba(33, 142, 126, 0.25); border-radius: 8px; padding: 14px; color: #173d37; background: rgba(33, 142, 126, 0.07); text-decoration: none; }
+.community-link > svg { color: #218e7e; }
+.community-link span { display: grid; gap: 3px; }
+.community-link small { color: #55615b; line-height: 1.35; }
+.app-version { margin: 18px 0 0; color: #68736d; font-size: 0.8rem; }
+
 .library-path article {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
