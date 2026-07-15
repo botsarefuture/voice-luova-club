@@ -17,7 +17,8 @@ ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
 
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://95.216.45.31:27017")
-MONGO_DB = os.environ.get("MONGO_DB", "lilt_voice")
+MONGO_DB = os.environ.get("MONGO_DB", "femmevoice")
+LEGACY_MONGO_DB = os.environ.get("LEGACY_MONGO_DB", "voice_luova_club")
 LEGACY_AUTH_BASE = os.environ.get("LEGACY_AUTH_BASE") or os.environ.get("LUOVA_AUTH_BASE", "https://auth.luova.club")
 LEGACY_AUTH_APP_ID = os.environ.get("LEGACY_AUTH_APP_ID") or os.environ.get("LUOVA_AUTH_APP_ID", "")
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://voice.luova.club")
@@ -42,7 +43,9 @@ app.config.update(
 )
 client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=3000)
 db = client[MONGO_DB]
+legacy_db = client[LEGACY_MONGO_DB]
 progress_collection = db["progress"]
+legacy_progress_collection = legacy_db["progress"]
 users_collection = db["users"]
 progress_collection.create_index([("device_id", ASCENDING)])
 progress_collection.create_index([("storage_key", ASCENDING)], unique=True)
@@ -136,7 +139,10 @@ def storage_key(device_id):
 
 
 def migrate_progress(legacy_username, account_key, account_user):
-    legacy = progress_collection.find_one({"storage_key": f"luovaauth:{legacy_username}"})
+    legacy_key = f"luovaauth:{legacy_username}"
+    legacy = progress_collection.find_one({"storage_key": legacy_key})
+    if not legacy:
+        legacy = legacy_progress_collection.find_one({"storage_key": legacy_key})
     if not legacy or not isinstance(legacy.get("progress"), dict):
         return False
     timestamp = now_iso()
