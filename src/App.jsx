@@ -1027,6 +1027,14 @@ export default function App() {
         </div>
         <button className="primary-action" onClick={() => navigateTo("practice")}><Waves /> Continue practice</button>
       </section>
+      <section className="focus-picker" aria-label="Choose a practice focus">
+        <div><p className="eyebrow">Choose one small thing</p><h2>What would feel useful today?</h2></div>
+        <div className="focus-options">
+          <button onClick={() => { selectPracticeStep("warmup"); navigateTo("practice"); }}><HeartPulse /><strong>Feel easier</strong><span>Soft hums and gentle resets.</span></button>
+          <button onClick={() => { selectPracticeStep("pitch"); navigateTo("practice"); }}><Music2 /><strong>Explore pitch</strong><span>Small, forgiving steps by ear.</span></button>
+          <button onClick={() => { selectPracticeStep("speech"); navigateTo("practice"); }}><Waves /><strong>Use a phrase</strong><span>Bring one sound into real speech.</span></button>
+        </div>
+      </section>
       </>}
 
       {activeView === "practice" && <>

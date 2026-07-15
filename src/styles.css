@@ -345,6 +345,14 @@ svg {
 .voice-check-options button { min-height: 36px; border-radius: 8px; padding: 0 10px; color: #39423c; background: rgba(35, 38, 34, 0.07); font-weight: 720; }
 .voice-check-options button.selected { color: #fff9ee; background: #218e7e; }
 .voice-check-options button:last-child.selected { background: #c65278; }
+
+.focus-picker { margin-top: 14px; }
+.focus-picker h2 { margin: 0; font-size: 1.25rem; }
+.focus-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 11px; }
+.focus-options button { display: grid; gap: 6px; min-height: 124px; align-content: start; border: 1px solid rgba(35, 38, 34, 0.13); border-radius: 8px; padding: 14px; text-align: left; color: #232622; background: rgba(255, 252, 246, 0.78); }
+.focus-options button:hover { border-color: rgba(33, 142, 126, 0.5); background: rgba(33, 142, 126, 0.08); }
+.focus-options svg { color: #218e7e; }
+.focus-options span { color: #55615b; font-size: 0.88rem; line-height: 1.35; }
 .danger-action { min-height: 44px; border-radius: 8px; padding: 0 14px; color: #8f1e3a; background: rgba(198, 82, 120, 0.14); font-weight: 760; }
 .privacy-status { grid-column: 1 / -1; color: #17665b !important; font-weight: 700; }
 
@@ -1848,6 +1856,7 @@ canvas {
 
   .hero,
   .metrics-grid,
+  .focus-options,
   .micro-drills,
   .practice-flow,
   .progress-stats,
