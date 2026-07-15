@@ -435,6 +435,19 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const email = new URLSearchParams(window.location.search).get("email");
+    if (!email) return;
+    window.history.replaceState({}, "", `${window.location.pathname}#account`);
+    setActiveView("account");
+    if (email === "verified") {
+      setPrivacyStatus("Email verified. You can use it for recovery once password reset is enabled.");
+      loadMe().then(setAuthInfo);
+    } else {
+      setPrivacyStatus("That verification link is invalid or has expired. Request a new one from Account.");
+    }
+  }, []);
+
+  useEffect(() => {
     drawVisualizer();
   }, [history, targetFrequency, current.frequency, showExtendedRange]);
 

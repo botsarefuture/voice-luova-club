@@ -357,10 +357,10 @@ def verify_email():
     token = request.args.get("token", "")
     record = email_tokens_collection.find_one({"kind": "verify-email", "token_hash": email_token_hash(token)})
     if not record:
-        return redirect("/#account?email=invalid")
+        return redirect("/?email=invalid#account")
     users_collection.update_one({"_id": ObjectId(record["user_id"])}, {"$set": {"email": record["email"], "email_normalized": record["email"], "email_verified_at": now_iso()}})
     email_tokens_collection.delete_one({"_id": record["_id"]})
-    return redirect("/#account?email=verified")
+    return redirect("/?email=verified#account")
 
 
 @app.get("/api/privacy/export")
