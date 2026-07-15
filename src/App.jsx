@@ -285,6 +285,7 @@ export default function App() {
   const rafRef = useRef(null);
   const recordingRef = useRef(false);
   const attemptSamplesRef = useRef([]);
+  const rangeWindowRef = useRef([]);
   const toneRef = useRef(null);
   const timedPracticeMsRef = useRef(0);
   const lastTimerFrameRef = useRef(null);
@@ -507,14 +508,27 @@ export default function App() {
 
     if (analysis.frequency && analysis.clarity > 0.35) {
       const midi = frequencyToMidi(analysis.frequency);
-      setDailySession((session) => ({
-        ...session,
-        lowMidi: session.lowMidi === null ? midi : Math.min(session.lowMidi, midi),
-        highMidi: session.highMidi === null ? midi : Math.max(session.highMidi, midi),
-      }));
+      captureSustainedRangeNote(midi, sample.time);
+    } else {
+      rangeWindowRef.current = [];
     }
     updateSessionTimer(sample.time, Boolean(analysis.frequency && analysis.clarity > 0.35));
     rafRef.current = requestAnimationFrame(tick);
+  }
+
+  function captureSustainedRangeNote(midi, time) {
+    const windowStart = time - 420;
+    const window = [...rangeWindowRef.current, { midi, time }].filter((sample) => sample.time >= windowStart);
+    rangeWindowRef.current = window;
+    if (window.length < 8 || window[window.length - 1].time - window[0].time < 380) return;
+    const notes = window.map((sample) => sample.midi);
+    if (Math.max(...notes) - Math.min(...notes) > 0.8) return;
+    const steadyMidi = notes.slice().sort((a, b) => a - b)[Math.floor(notes.length / 2)];
+    setDailySession((session) => ({
+      ...session,
+      lowMidi: session.lowMidi === null ? steadyMidi : Math.min(session.lowMidi, steadyMidi),
+      highMidi: session.highMidi === null ? steadyMidi : Math.max(session.highMidi, steadyMidi),
+    }));
   }
 
   function updateSessionTimer(now, isVoiced) {
@@ -595,6 +609,7 @@ export default function App() {
     setDailySession(reset);
     saveTodaySession(reset);
     setHistory([]);
+    rangeWindowRef.current = [];
     setLastScore(null);
     setAttemptProgress(0);
   }
@@ -874,7 +889,7 @@ export default function App() {
 
       <section className="metrics-grid" aria-label="Daily voice metrics">
         <Metric icon={<Music2 />} label="Detected now" value={current.frequency ? midiToNoteName(currentMidi) : "--"} detail={formatFrequency(current.frequency)} />
-        <Metric icon={<Gauge />} label="Comfort range today" value={formatRange(dailySession.lowMidi, dailySession.highMidi)} detail={`${semitoneSpan(dailySession.lowMidi, dailySession.highMidi)} semitones mapped`} />
+        <Metric icon={<Gauge />} label="Comfort range today" value={formatRange(dailySession.lowMidi, dailySession.highMidi)} detail={`${semitoneSpan(dailySession.lowMidi, dailySession.highMidi)} sustained semitones mapped`} />
         <Metric icon={<Activity />} label="Stability" value={`${sessionStats.stability}%`} detail={`${sessionStats.stabilityLabel} pitch hold`} />
         <Metric icon={<HeartPulse />} label="Effort signal" value={sessionStats.effortLabel} detail={`Mic level ${Math.round(current.volume * 1000)}`} />
       </section>
@@ -1396,7 +1411,7 @@ function buildDailyComparison(days, todaySession) {
   const range = semitoneSpan(today.lowMidi, today.highMidi);
   const base = {
     highNote: today.highMidi === null ? "--" : midiToNoteName(today.highMidi),
-    highDetail: today.highMidi === null ? "Warm up to map it" : "Highest easy note today",
+    highDetail: today.highMidi === null ? "Warm up to map it" : "Held steadily for 0.4 sec",
     range: range ? `${range} st` : "--",
     rangeDetail: range ? "Comfort range mapped" : "Keep it gentle",
   };
