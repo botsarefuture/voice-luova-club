@@ -46,6 +46,7 @@ import {
 
 const EXERCISE_STEPS = [0, 1, 2, 3, 5, 7, 8, 10, 12];
 const DEFAULT_COMFORT_ANCHOR = 52;
+const MAX_TRAINING_MIDI = 77;
 
 const PRACTICE_FLOW = [
   {
@@ -274,17 +275,23 @@ export default function App() {
 
   const targetMidi = useMemo(() => {
     if (exerciseMode === "resonance-step" && dailySession.highMidi !== null) {
-      return Math.min(76, Math.max(62, dailySession.highMidi));
+      return Math.min(MAX_TRAINING_MIDI, Math.max(45, dailySession.highMidi));
     }
     if (exerciseMode === "speech-floor" && dailySession.lowMidi !== null) {
-      return Math.max(52, Math.min(64, dailySession.lowMidi + 2));
+      return Math.min(MAX_TRAINING_MIDI, Math.max(45, dailySession.lowMidi + 2));
     }
-    return (comfortAnchorMidi ?? DEFAULT_COMFORT_ANCHOR) + (EXERCISE_STEPS[targetIndex] ?? EXERCISE_STEPS[0]);
+    return Math.min(
+      MAX_TRAINING_MIDI,
+      (comfortAnchorMidi ?? DEFAULT_COMFORT_ANCHOR) + (EXERCISE_STEPS[targetIndex] ?? EXERCISE_STEPS[0]),
+    );
   }, [comfortAnchorMidi, dailySession.highMidi, dailySession.lowMidi, exerciseMode, targetIndex]);
 
   const targetFrequency = midiToFrequency(targetMidi);
-  const rememberedTargetMidi = (progress.comfortAnchorMidi ?? DEFAULT_COMFORT_ANCHOR)
-    + (EXERCISE_STEPS[progress.lastTargetIndex] ?? EXERCISE_STEPS[0]);
+  const rememberedTargetMidi = Math.min(
+    MAX_TRAINING_MIDI,
+    (progress.comfortAnchorMidi ?? DEFAULT_COMFORT_ANCHOR)
+      + (EXERCISE_STEPS[progress.lastTargetIndex] ?? EXERCISE_STEPS[0]),
+  );
   const currentMidi = current.frequency ? frequencyToMidi(current.frequency) : null;
   const currentCents = current.frequency ? centsOff(current.frequency, targetFrequency) : null;
   const sessionStats = useMemo(() => summarizeSession(history, current, dailySession), [history, current, dailySession]);
@@ -406,8 +413,8 @@ export default function App() {
     if (voiced.length < 12) return;
     const midis = voiced.map((sample) => frequencyToMidi(sample.frequency)).sort((a, b) => a - b);
     const median = midis[Math.floor(midis.length / 2)];
-    // Begin only a tiny step above the easy hum, never with a high preset.
-    setComfortAnchorMidi(Math.max(48, Math.min(57, median + 1)));
+    // Use the person's easy hum as the anchor; do not pull it down to a preset range.
+    setComfortAnchorMidi(Math.max(45, Math.min(MAX_TRAINING_MIDI, median + 1)));
   }, [comfortAnchorMidi, history]);
 
   useEffect(() => () => {
@@ -557,6 +564,12 @@ export default function App() {
 
   function nextHumDrill() {
     setHumDrillIndex((index) => (index + 1) % HUM_DRILLS.length);
+  }
+
+  function recalibrateComfortAnchor() {
+    setComfortAnchorMidi(null);
+    setTargetIndex(0);
+    setLastScore(null);
   }
 
   function selectPracticeStep(stepId) {
@@ -869,6 +882,14 @@ export default function App() {
               <strong>{midiToNoteName(targetMidi)}</strong>
               <small>{Math.round(targetFrequency)} Hz</small>
             </div>
+            <button
+              className="icon-action"
+              onClick={recalibrateComfortAnchor}
+              aria-label="Use my current easy hum as the starting note"
+              title="Use my current easy hum as the starting note"
+            >
+              <RotateCcw />
+            </button>
             <button className="icon-action" onClick={() => moveTarget(-1)} disabled={targetIndex === 0} aria-label="Use an easier target" title="Use an easier target">
               <ChevronLeft />
             </button>
