@@ -16,6 +16,7 @@ import {
   Music2,
   PauseCircle,
   RotateCcw,
+  ScrollText,
   Trash2,
   Sparkles,
   Square,
@@ -62,11 +63,12 @@ const APP_VIEWS = [
   { id: "practice", label: "Practice", icon: Waves },
   { id: "progress", label: "Progress", icon: Activity },
   { id: "learn", label: "Learn", icon: BookOpen },
+  { id: "guide", label: "Guide", icon: ScrollText },
   { id: "account", label: "Settings", icon: UserRound },
   { id: "privacy", label: "Privacy", icon: ShieldCheck },
   { id: "feedback", label: "Feedback", icon: MessageCircle },
 ];
-const MAIN_VIEW_IDS = new Set(["today", "practice", "progress", "learn"]);
+const MAIN_VIEW_IDS = new Set(["today", "practice", "progress", "learn", "guide"]);
 
 function initialView() {
   const view = window.location.hash.replace("#", "");
@@ -279,6 +281,69 @@ const LEARNING_RESOURCES = [
   { category: "safety", label: "ASHA: gender-affirming voice and communication", kind: "Clinical reading", detail: "An overview from speech-language pathologists on client-led goals, vocal health, and the many parts of communication beyond pitch.", href: "https://www.asha.org/public/speech/disorders/Voice-and-Communication-Change-for-Transgender-People/" },
   { category: "safety", label: "Common voice-training myths", kind: "Video", detail: "Helpful context for separating sound-based exploration from rules that encourage strain or overly rigid technique.", href: "https://www.youtube.com/watch?v=gHyVNIcw_XI" },
   { category: "safety", label: "Older guides, read with care", kind: "Historical context", detail: "Older material can be interesting for ideas, but skip any instruction that asks you to swallow, force the larynx, or work through pain.", href: "https://docs.google.com/document/d/1MOd5CJQUGmUD5e1p7_CLxWLU-aFiUTmKvL0SoT-LhEk/edit" },
+];
+
+const RESEARCH_GUIDE = [
+  {
+    id: "purpose",
+    topic: "What this guide is for",
+    takeaway: "FemmeVoice is a practical, evidence-informed place to explore a voice that feels more like you. It is not a rulebook for womanhood or a promise about how strangers will perceive you.",
+    practice: "Use the ideas here as small experiments. Keep what feels clear, comfortable, expressive, and personally affirming.",
+    limit: "App feedback cannot measure every part of a voice or replace your own ears, your goals, or clinical care.",
+    sources: [],
+  },
+  {
+    id: "pitch",
+    topic: "Pitch is useful, not the whole voice",
+    takeaway: "Speaking pitch can affect how a voice is perceived, but resonance, vocal quality, articulation, prosody, and a listener's expectations matter too.",
+    practice: "Use the pitch map as orientation. Build an easy speaking area before trying to hold a high note.",
+    limit: "No single frequency can guarantee how another person will gender a voice.",
+    sources: [
+      { label: "Voice, articulation, and prosody systematic review", href: "https://pubs.asha.org/doi/10.1044/2017_JSLHR-S-17-0067" },
+      { label: "Gender-affirming voice modification review", href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC10387149/" },
+    ],
+  },
+  {
+    id: "range-data",
+    topic: "Sustained practice data should be interpretable",
+    takeaway: "Voice-range work is more useful when collection is consistent and based on sustained phonation rather than one noisy instantaneous reading.",
+    practice: "FemmeVoice keeps short steady sounds as explored pitch and uses longer holds only to advance a reference.",
+    limit: "This app is not a clinical voice-range profile and cannot diagnose vocal health.",
+    sources: [
+      { label: "Voice Range Profile standardization study", href: "https://pubmed.ncbi.nlm.nih.gov/32402662/" },
+      { label: "Shortened Voice Range Profile protocol", href: "https://pubmed.ncbi.nlm.nih.gov/34099353/" },
+    ],
+  },
+  {
+    id: "intonation",
+    topic: "Intonation is meaning, not a rulebook",
+    takeaway: "Pitch movement across phrases can contribute to how speech is heard. Its relationship to perceived gender is contextual and varies between people.",
+    practice: "Use statement, question, and emphasis exercises to explore how you want meaning to sound. Keep contours that feel expressive and natural to you.",
+    limit: "There is no universal feminine contour, and FemmeVoice does not grade any pattern as more feminine.",
+    sources: [
+      { label: "Intonation and gender perception", href: "https://pubmed.ncbi.nlm.nih.gov/24094799/" },
+      { label: "Intonation parameters in gender-diverse people", href: "https://www.sciencedirect.com/science/article/pii/S0892199722004209" },
+    ],
+  },
+  {
+    id: "health",
+    topic: "Comfort and vocal health come first",
+    takeaway: "Training should be adjustable, repeatable, and stopped when pain, persistent scratchiness, or unusual hoarseness appears.",
+    practice: "Use short sessions, rest breaks, gentle volume, and a reset to an easy hum. A quieter day is still useful practice.",
+    limit: "Online guidance is not a substitute for a voice-specialized clinician, especially for ongoing symptoms.",
+    sources: [
+      { label: "UCSF vocal health guidance", href: "https://transcare.ucsf.edu/guidelines/vocal-health" },
+      { label: "Speech therapy systematic review", href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC10363306/" },
+    ],
+  },
+  {
+    id: "app-data",
+    topic: "Understanding your FemmeVoice data",
+    takeaway: "Explored pitch is a short steady sound. Verified holds are longer checks near a reference. Neither is a score for femininity or worth.",
+    practice: "Compare trends across gentle practice days, not one unusually high or low moment. Use recordings only if you chose to enable them.",
+    limit: "Microphone quality, room noise, hydration, sleep, stress, and warmup can all change a reading.",
+    sources: [],
+  },
 ];
 
 export default function App() {
@@ -1247,7 +1312,7 @@ export default function App() {
         <section className="view-intro">
           <p className="eyebrow">FemmeVoice</p>
           <h1>{APP_VIEWS.find((view) => view.id === activeView)?.label}</h1>
-          <p>{activeView === "practice" ? "One calm exercise at a time. Stop any time your voice stops feeling easy." : activeView === "progress" ? "Your practice history, range notes, and gentle next steps." : activeView === "learn" ? "Simple explanations first, then deeper resources whenever you want them." : activeView === "privacy" ? "A plain-language account of what FemmeVoice stores, why, and how you stay in control." : activeView === "feedback" ? "Tell us what feels useful, unclear, missing, or unsafe. Thoughtful feedback shapes FemmeVoice." : "Your private FemmeVoice account, preferences, and safety information."}</p>
+          <p>{activeView === "practice" ? "One calm exercise at a time. Stop any time your voice stops feeling easy." : activeView === "progress" ? "Your practice history, range notes, and gentle next steps." : activeView === "learn" ? "Simple explanations first, then deeper resources whenever you want them." : activeView === "guide" ? "What FemmeVoice is based on, what its measurements mean, and where the evidence has limits." : activeView === "privacy" ? "A plain-language account of what FemmeVoice stores, why, and how you stay in control." : activeView === "feedback" ? "Tell us what feels useful, unclear, missing, or unsafe. Thoughtful feedback shapes FemmeVoice." : "Your private FemmeVoice account, preferences, and safety information."}</p>
         </section>
       )}
 
@@ -1778,6 +1843,46 @@ export default function App() {
             </a>
           ))}
         </div>
+      </section>}
+
+      {activeView === "guide" && <section className="research-guide" aria-label="FemmeVoice evidence guide">
+        <div className="guide-heading">
+          <div>
+            <p className="eyebrow">Evidence guide</p>
+            <h2>Research, translated into human practice.</h2>
+            <p>This guide explains the ideas behind FemmeVoice, the limits of its measurements, and the sources we use. It is a living public document, not medical advice or a rulebook for how anyone should sound.</p>
+          </div>
+          <ScrollText />
+        </div>
+
+        <nav className="guide-toc" aria-label="Guide contents">
+          <strong>Contents</strong>
+          <ol>{RESEARCH_GUIDE.map((chapter, index) => <li key={chapter.id}><a href={`#${chapter.id}`}>{index + 1}. {chapter.topic}</a></li>)}</ol>
+        </nav>
+
+        <div className="guide-cards">
+          {RESEARCH_GUIDE.map((chapter) => <article className="guide-card" id={chapter.id} key={chapter.id}>
+            <p className="eyebrow">{chapter.topic}</p>
+            <h3>{chapter.takeaway}</h3>
+            <div className="guide-card-copy"><strong>Try this</strong><p>{chapter.practice}</p></div>
+            <div className="guide-card-limit"><strong>Keep in mind</strong><p>{chapter.limit}</p></div>
+            {chapter.sources.length > 0 && <div className="guide-card-sources"><strong>Sources</strong>{chapter.sources.map((source) => <a href={source.href} key={source.href} target="_blank" rel="noreferrer">{source.label} <ExternalLink /></a>)}</div>}
+          </article>)}
+        </div>
+
+        <section className="contribution-panel" aria-label="Contribute to this guide">
+          <div>
+            <p className="eyebrow">Help improve this guide</p>
+            <h3>Knowledge gets better when people can question it.</h3>
+            <p>Suggest a source, flag wording that feels unclear or harmful, share a community resource, or improve the guide directly. We welcome lived experience alongside research, and label each clearly.</p>
+          </div>
+          <div className="contribution-actions">
+            <a href="https://github.com/botsarefuture/voice-luova-club/issues/new?title=Research%20source%20suggestion" target="_blank" rel="noreferrer">Suggest a source <ExternalLink /></a>
+            <a href="https://github.com/botsarefuture/voice-luova-club/pulls" target="_blank" rel="noreferrer">Open a pull request <ExternalLink /></a>
+            <a href="https://discord.gg/Vh5N2WEJtU" target="_blank" rel="noreferrer">Discuss in the community <MessageCircle /></a>
+          </div>
+          <small>Please include a direct link, describe what it supports, name conflicts of interest where known, and avoid advice that asks people to force or manually manipulate the larynx.</small>
+        </section>
       </section>}
 
       {activeView === "account" && <>
