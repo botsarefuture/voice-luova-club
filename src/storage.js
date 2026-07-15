@@ -20,6 +20,7 @@ export function loadTodaySession() {
     highMidi: null,
     attempts: [],
     minutes: 0,
+    seconds: 0,
     breakAcknowledged: [],
   };
 }

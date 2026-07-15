@@ -286,6 +286,7 @@ export default function App() {
   const attemptSamplesRef = useRef([]);
   const toneRef = useRef(null);
   const startTimeRef = useRef(Date.now());
+  const sessionTimerRef = useRef(null);
   const progressTimerRef = useRef(null);
   const cloudLoadedRef = useRef(false);
 
@@ -317,7 +318,8 @@ export default function App() {
   const activeHumDrill = HUM_DRILLS[humDrillIndex] ?? HUM_DRILLS[0];
   const activeStageExercise = STAGE_EXERCISES[activeStep] ?? STAGE_EXERCISES.warmup;
   const activeTier = PRACTICE_TIERS[practiceTier] ?? PRACTICE_TIERS.starter;
-  const sessionPlan = useMemo(() => buildSessionPlan(activeTier, dailySession.minutes), [activeTier, dailySession.minutes]);
+  const sessionSeconds = dailySession.seconds ?? dailySession.minutes * 60;
+  const sessionPlan = useMemo(() => buildSessionPlan(activeTier, sessionSeconds), [activeTier, sessionSeconds]);
   const breakReminder = useMemo(
     () => getBreakReminder(activeTier, dailySession),
     [activeTier, dailySession],
@@ -457,7 +459,9 @@ export default function App() {
       source.connect(analyser);
       audioRef.current = { audioContext, analyser, stream, buffer: new Float32Array(analyser.fftSize) };
       setListening(true);
-      startTimeRef.current = Date.now();
+      startTimeRef.current = Date.now() - sessionSeconds * 1000;
+      updateSessionTimer();
+      sessionTimerRef.current = window.setInterval(updateSessionTimer, 1000);
       tick();
       return true;
     } catch (error) {
@@ -469,8 +473,10 @@ export default function App() {
   function stopListening() {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     if (progressTimerRef.current) window.clearInterval(progressTimerRef.current);
+    if (sessionTimerRef.current) window.clearInterval(sessionTimerRef.current);
     rafRef.current = null;
     progressTimerRef.current = null;
+    sessionTimerRef.current = null;
     recordingRef.current = false;
     const audio = audioRef.current;
     if (audio) {
@@ -502,10 +508,18 @@ export default function App() {
         ...session,
         lowMidi: session.lowMidi === null ? midi : Math.min(session.lowMidi, midi),
         highMidi: session.highMidi === null ? midi : Math.max(session.highMidi, midi),
-        minutes: Math.max(session.minutes, Math.round((Date.now() - startTimeRef.current) / 60000)),
       }));
     }
     rafRef.current = requestAnimationFrame(tick);
+  }
+
+  function updateSessionTimer() {
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startTimeRef.current) / 1000));
+    setDailySession((session) => {
+      const previousSeconds = session.seconds ?? session.minutes * 60;
+      if (elapsedSeconds <= previousSeconds) return session;
+      return { ...session, seconds: elapsedSeconds, minutes: Math.floor(elapsedSeconds / 60) };
+    });
   }
 
   function startTone() {
@@ -569,7 +583,7 @@ export default function App() {
   }
 
   function resetDay() {
-    const reset = { date: dayKey(), lowMidi: null, highMidi: null, attempts: [], minutes: 0, breakAcknowledged: [] };
+    const reset = { date: dayKey(), lowMidi: null, highMidi: null, attempts: [], minutes: 0, seconds: 0, breakAcknowledged: [] };
     setDailySession(reset);
     saveTodaySession(reset);
     setHistory([]);
@@ -832,7 +846,7 @@ export default function App() {
       <section className="practice-tier-panel" aria-label="Practice tier and rest guidance">
         <div>
           <p className="eyebrow">Today’s training tier</p>
-          <h2>{activeTier.label} session: {dailySession.minutes}/{activeTier.minutes} minutes</h2>
+          <h2>{activeTier.label} session: {formatSessionTime(sessionSeconds)} / {activeTier.minutes}:00</h2>
           <p>{sessionPlan.message}</p>
         </div>
         <div className="tier-options">
@@ -1303,21 +1317,28 @@ function summarizeProgress(progress) {
   };
 }
 
-function buildSessionPlan(tier, minutes) {
-  const percent = Math.max(4, Math.min(100, Math.round((minutes / tier.minutes) * 100)));
-  const remaining = Math.max(0, tier.minutes - minutes);
-  if (remaining === 0) {
+function formatSessionTime(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function buildSessionPlan(tier, seconds) {
+  const targetSeconds = tier.minutes * 60;
+  const percent = Math.max(4, Math.min(100, Math.round((seconds / targetSeconds) * 100)));
+  const remainingSeconds = Math.max(0, targetSeconds - seconds);
+  if (remainingSeconds === 0) {
     return {
       percent,
       message: "You reached today’s planned practice time. Cool down, drink water, and let the voice rest.",
     };
   }
-  if (minutes === 0) {
+  if (seconds === 0) {
     return {
       percent,
       message: `${tier.description} Start with warmups, then do a few scored repeats.`,
     };
   }
+  const remaining = Math.ceil(remainingSeconds / 60);
   return {
     percent,
     message: `${remaining} minute${remaining === 1 ? "" : "s"} left. Keep everything gentle enough that you could still chat afterward.`,
