@@ -195,12 +195,14 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState("local");
   const [authInfo, setAuthInfo] = useState({ authenticated: false, user: null });
   const [resourceFilter, setResourceFilter] = useState("start");
+  const [showExtendedRange, setShowExtendedRange] = useState(() => loadProgress().showExtendedRange ?? false);
 
   const audioRef = useRef(null);
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
   const recordingRef = useRef(false);
   const attemptSamplesRef = useRef([]);
+  const toneRef = useRef(null);
   const startTimeRef = useRef(Date.now());
   const progressTimerRef = useRef(null);
   const cloudLoadedRef = useRef(false);
@@ -258,6 +260,7 @@ export default function App() {
       exerciseMode,
       practiceTier,
       comfortAnchorMidi,
+      showExtendedRange,
     }));
   }, [dailySession]);
 
@@ -268,8 +271,9 @@ export default function App() {
       exerciseMode,
       practiceTier,
       comfortAnchorMidi,
+      showExtendedRange,
     }));
-  }, [targetIndex, activeStep, exerciseMode, practiceTier]);
+  }, [targetIndex, activeStep, exerciseMode, practiceTier, comfortAnchorMidi, showExtendedRange]);
 
   useEffect(() => {
     saveProgress(progress);
@@ -300,6 +304,7 @@ export default function App() {
           setExerciseMode(merged.lastMode ?? "comfort-ladder");
           setPracticeTier(merged.practiceTier ?? "starter");
           setComfortAnchorMidi(merged.comfortAnchorMidi ?? null);
+          setShowExtendedRange(merged.showExtendedRange ?? false);
         }
         setSyncStatus("synced");
       })
@@ -316,7 +321,7 @@ export default function App() {
 
   useEffect(() => {
     drawVisualizer();
-  }, [history, targetFrequency, current.frequency]);
+  }, [history, targetFrequency, current.frequency, showExtendedRange]);
 
   useEffect(() => {
     if (comfortAnchorMidi !== null) return;
@@ -328,7 +333,10 @@ export default function App() {
     setComfortAnchorMidi(Math.max(48, Math.min(57, median + 1)));
   }, [comfortAnchorMidi, history]);
 
-  useEffect(() => () => stopListening(), []);
+  useEffect(() => () => {
+    stopListening();
+    stopTone();
+  }, []);
 
   async function startListening() {
     try {
@@ -394,7 +402,8 @@ export default function App() {
     rafRef.current = requestAnimationFrame(tick);
   }
 
-  async function playTone() {
+  function startTone() {
+    if (toneRef.current) return;
     setIsPlayingTone(true);
     const audioContext = new AudioContext();
     const oscillator = audioContext.createOscillator();
@@ -403,14 +412,22 @@ export default function App() {
     oscillator.frequency.value = targetFrequency;
     gain.gain.setValueAtTime(0, audioContext.currentTime);
     gain.gain.linearRampToValueAtTime(0.16, audioContext.currentTime + 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 1.35);
     oscillator.connect(gain).connect(audioContext.destination);
     oscillator.start();
-    oscillator.stop(audioContext.currentTime + 1.4);
-    oscillator.onended = () => {
-      audioContext.close();
-      setIsPlayingTone(false);
-    };
+    toneRef.current = { audioContext, oscillator, gain };
+  }
+
+  function stopTone() {
+    const tone = toneRef.current;
+    if (!tone) return;
+    toneRef.current = null;
+    const now = tone.audioContext.currentTime;
+    tone.gain.gain.cancelScheduledValues(now);
+    tone.gain.gain.setValueAtTime(Math.max(0.001, tone.gain.gain.value), now);
+    tone.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    tone.oscillator.stop(now + 0.06);
+    tone.oscillator.onended = () => tone.audioContext.close();
+    setIsPlayingTone(false);
   }
 
   async function beginAttempt() {
@@ -484,30 +501,42 @@ export default function App() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
-    const minMidi = 45;
-    const maxMidi = 84;
+    const minMidi = 48;
+    const maxMidi = showExtendedRange ? 77 : 62;
     const xFor = (index, total) => (total <= 1 ? 0 : (index / (total - 1)) * width);
     const yForMidi = (midi) => height - ((midi - minMidi) / (maxMidi - minMidi)) * height;
 
-    ctx.fillStyle = "rgba(123, 79, 214, 0.08)";
-    ctx.fillRect(0, yForMidi(76), width, yForMidi(60) - yForMidi(76));
+    const rangeBands = [
+      { low: 48, high: 49.5, color: "rgba(46, 115, 204, 0.22)", label: "lower" },
+      { low: 49.5, high: 53.5, color: "rgba(92, 99, 107, 0.14)", label: "neutral" },
+      { low: 53.5, high: 61.5, color: "rgba(218, 77, 137, 0.18)", label: "bright" },
+    ];
+    if (showExtendedRange) {
+      rangeBands.push({ low: 61.5, high: 77, color: "rgba(126, 83, 190, 0.16)", label: "extended" });
+    }
+    rangeBands.forEach((band) => {
+      ctx.fillStyle = band.color;
+      ctx.fillRect(0, yForMidi(band.high), width, yForMidi(band.low) - yForMidi(band.high));
+      ctx.fillStyle = "rgba(35, 38, 34, 0.55)";
+      ctx.font = "11px system-ui";
+      ctx.fillText(band.label, width - 68, yForMidi(band.high) + 16);
+    });
     ctx.fillStyle = "rgba(20, 122, 126, 0.09)";
     ctx.fillRect(0, yForMidi(targetMidi + 0.18), width, yForMidi(targetMidi - 0.18) - yForMidi(targetMidi + 0.18));
 
     ctx.strokeStyle = "rgba(34, 35, 32, 0.13)";
     ctx.lineWidth = 1;
-    for (let midi = 48; midi <= 84; midi += 6) {
+    const gridNotes = showExtendedRange ? [48, 49, 50, 53, 54, 61, 72, 77] : [48, 49, 50, 53, 54, 61];
+    gridNotes.forEach((midi) => {
       const y = yForMidi(midi);
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(width, y);
       ctx.stroke();
-      if (midi % 12 === 0) {
-        ctx.fillStyle = "rgba(34, 35, 32, 0.58)";
-        ctx.font = "12px system-ui";
-        ctx.fillText(midiToNoteName(midi), 12, y - 6);
-      }
-    }
+      ctx.fillStyle = "rgba(34, 35, 32, 0.58)";
+      ctx.font = "12px system-ui";
+      ctx.fillText(midiToNoteName(midi), 12, y - 6);
+    });
 
     const targetY = yForMidi(targetMidi);
     ctx.strokeStyle = "#147a7e";
@@ -545,8 +574,8 @@ export default function App() {
     <main className="app-shell">
       <section className="hero">
         <div>
-          <p className="eyebrow">LuovaVoice</p>
-          <h1>Build a transfemme voice that feels bright, easy, and yours.</h1>
+          <p className="eyebrow">Lilt Voice</p>
+          <h1>Find a voice that feels easy, expressive, and yours.</h1>
           <p className="hero-copy">
             Real-time pitch tracking and guided listening drills for weight, pitch comfort, brightness, and speech
             carryover. This is a practice companion, not a diagnosis: stop for pain, scratchiness, or fatigue.
@@ -558,7 +587,7 @@ export default function App() {
               {authInfo.user?.display_name || authInfo.user?.username || "Signed in"}
             </a>
           ) : (
-            <a className="auth-action" href="/auth/login">Sign in with LuovaAuth</a>
+            <a className="auth-action" href="/auth/login">Sign in to save progress</a>
           )}
           <button className="primary-action" onClick={listening ? stopListening : startListening}>
             {listening ? <Square /> : <Mic />}
@@ -618,7 +647,7 @@ export default function App() {
           </p>
           <span className={syncStatus === "synced" ? "sync-pill synced" : "sync-pill"}>
             {syncStatus === "synced"
-              ? authInfo.authenticated ? "LuovaAuth progress synced" : "Anonymous cloud synced"
+              ? authInfo.authenticated ? "Account progress synced" : "Anonymous cloud synced"
               : syncStatus === "syncing" ? "Syncing progress" : "Saved on this device"}
           </span>
         </div>
@@ -721,9 +750,29 @@ export default function App() {
             <button className="icon-action" onClick={() => moveTarget(-1)} disabled={targetIndex === 0} aria-label="Use an easier target" title="Use an easier target">
               <ChevronLeft />
             </button>
-            <button onClick={playTone} disabled={isPlayingTone}>
+            <button
+              className={isPlayingTone ? "tone-button playing" : "tone-button"}
+              onPointerDown={(event) => {
+                event.currentTarget.setPointerCapture?.(event.pointerId);
+                startTone();
+              }}
+              onPointerUp={(event) => {
+                event.currentTarget.releasePointerCapture?.(event.pointerId);
+                stopTone();
+              }}
+              onPointerCancel={stopTone}
+              onBlur={stopTone}
+              onKeyDown={(event) => {
+                if (!event.repeat && (event.key === " " || event.key === "Enter")) startTone();
+              }}
+              onKeyUp={(event) => {
+                if (event.key === " " || event.key === "Enter") stopTone();
+              }}
+              aria-label="Hold to hear the target tone"
+              title="Hold to hear the target tone"
+            >
               <Volume2 />
-              Play tone
+              {isPlayingTone ? "Release to stop" : "Hold to hear"}
             </button>
             <button className="primary-action" onClick={beginAttempt} disabled={recordingAttempt}>
               <Target />
@@ -797,6 +846,23 @@ export default function App() {
 
           <canvas ref={canvasRef} width="980" height="340" aria-label="Pitch trace against the exercise target" />
 
+          <div className="range-map" aria-label="Pitch reference range map">
+            <div className="range-map-heading">
+              <div>
+                <p className="eyebrow">Pitch reference map</p>
+                <h3>Use the colours to orient yourself, not to grade yourself.</h3>
+              </div>
+              <span>{showExtendedRange ? "C3 - F5" : "C3 - C#4"}</span>
+            </div>
+            <div className="range-map-legend">
+              <span className="range-band blue"><b>C3 - C#3</b> Lower / masc-coded reference</span>
+              <span className="range-band gray"><b>D3 - F3</b> Neutral reference</span>
+              <span className="range-band pink"><b>F#3 - C#4</b> Bright reference</span>
+              {showExtendedRange && <span className="range-band violet"><b>D4 - F5</b> Extended exploration</span>}
+            </div>
+            <p>Every voice has its own comfortable range. These bands are a visual guide for exploration, not a promise about what you should sound like or reach.</p>
+          </div>
+
           <div className="micro-drills" aria-label="Transfemme voice practice prompts">
             <PracticeCard number="1" title="Hear it" text="Play the tone once, then imagine it as small, forward, and unforced." />
             <PracticeCard number="2" title="Shape it" text='Repeat on "ee", "ih", or a soft hum while keeping throat effort low.' />
@@ -844,6 +910,21 @@ export default function App() {
               Pitch helps, but it is not the whole voice. This app measures pitch, steadiness, and level; it cannot
               measure resonance or vocal weight for you. Use the listening prompts to explore those safely.
             </p>
+          </div>
+
+          <div className="account-settings">
+            <p className="eyebrow">Your settings</p>
+            <h3>Range view</h3>
+            <label className="setting-toggle">
+              <input
+                type="checkbox"
+                checked={showExtendedRange}
+                onChange={(event) => setShowExtendedRange(event.target.checked)}
+              />
+              <span aria-hidden="true" />
+              <strong>Show extended upper range to F5</strong>
+            </label>
+            <p>Saved with your progress. Turn it on when you want to explore higher notes, not because you have to reach them.</p>
           </div>
 
           <div className="tip-list">

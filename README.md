@@ -1,15 +1,14 @@
-# LuovaVoice
+# Lilt Voice
 
-Transfemme voice-training web app for `voice.luova.club`.
+Transfemme voice-training web app.
 
 ## Production
 
 - Frontend: Vite/React static build in `dist/`
 - Backend: Flask/Gunicorn WSGI app in `server/`
-- Auth: LuovaAuth via `flask_lac`
-- Database: MongoDB on `lc-db`, database `voice_luova_club`, collection `progress`
-- Service: `voice_luova_club.service` on `lc-main`
-- Apache vhost: `voice.luova.club`
+- Auth: connected OAuth provider via `flask_lac`
+- Database: MongoDB progress storage
+- Service: Gunicorn/Flask backend
 
 Progress sync stores only app progress data. Audio analysis runs in the browser; raw microphone audio is not uploaded.
 
