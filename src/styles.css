@@ -315,6 +315,7 @@ svg {
 .compact-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .compact-options .tier-option { min-height: 58px; padding: 8px; }
 .privacy-link { margin-top: 14px; }
+.range-correction { margin-top: 12px; color: #8f1e3a; }
 
 .privacy-page { max-width: 980px; }
 .privacy-policy-heading { display: flex; gap: 14px; align-items: start; margin-bottom: 20px; }

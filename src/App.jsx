@@ -631,6 +631,23 @@ export default function App() {
     setAttemptProgress(0);
   }
 
+  function removeSavedHighOutlier() {
+    const outlier = progress.bestHighMidi;
+    if (outlier === null) return;
+    if (!window.confirm(`Remove ${midiToNoteName(outlier)} as a false high-note outlier? This keeps your other progress.`)) return;
+    const remainingHighs = [
+      ...progress.days.map((day) => day.highMidi),
+      dailySession.highMidi,
+    ].filter((midi) => midi !== null && midi < outlier);
+    const replacement = remainingHighs.length ? Math.max(...remainingHighs) : null;
+    setDailySession((session) => session.highMidi === outlier ? { ...session, highMidi: null } : session);
+    setProgress((currentProgress) => ({
+      ...currentProgress,
+      bestHighMidi: replacement,
+      days: currentProgress.days.map((day) => day.highMidi === outlier ? { ...day, highMidi: null } : day),
+    }));
+  }
+
   function acknowledgeBreak(id) {
     setDailySession((session) => ({
       ...session,
@@ -1260,6 +1277,7 @@ export default function App() {
             Best saved range: {formatRange(progress.bestLowMidi, progress.bestHighMidi)}.
             {progress.bestScore !== null ? ` Best scored repeat: ${progress.bestScore}/100 on ${progress.bestScoreNote}.` : "Score a repeat to begin your history."}
           </p>
+          {progress.bestHighMidi !== null && <button className="account-link range-correction" onClick={removeSavedHighOutlier}>Remove {midiToNoteName(progress.bestHighMidi)} as a false high-note outlier</button>}
           <span className={syncStatus === "synced" ? "sync-pill synced" : "sync-pill"}>
             {syncStatus === "synced" ? authInfo.authenticated ? "Account progress synced" : "Anonymous cloud synced" : syncStatus === "syncing" ? "Syncing progress" : "Saved on this device"}
           </span>
