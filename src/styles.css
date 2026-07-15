@@ -314,6 +314,15 @@ svg {
 .account-settings-grid dd { margin: 0; font-weight: 720; text-align: right; }
 .compact-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .compact-options .tier-option { min-height: 58px; padding: 8px; }
+.privacy-link { margin-top: 14px; }
+
+.privacy-page { max-width: 980px; }
+.privacy-policy-heading { display: flex; gap: 14px; align-items: start; margin-bottom: 20px; }
+.privacy-policy-heading > svg { width: 32px; height: 32px; flex: none; color: #218e7e; }
+.privacy-policy-heading h2, .privacy-policy-heading p { margin: 0; }
+.privacy-policy-heading > div > p:last-child { margin-top: 8px; color: #525a54; }
+.privacy-page .privacy-grid article { min-height: 144px; }
+.privacy-page .privacy-grid a { color: #17665b; font-weight: 720; }
 .danger-action { min-height: 44px; border-radius: 8px; padding: 0 14px; color: #8f1e3a; background: rgba(198, 82, 120, 0.14); font-weight: 760; }
 .privacy-status { grid-column: 1 / -1; color: #17665b !important; font-weight: 700; }
 

@@ -22,6 +22,7 @@ import {
   UserRound,
   Volume2,
   Waves,
+  ShieldCheck,
 } from "lucide-react";
 import {
   analyzePitch,
@@ -56,6 +57,7 @@ const APP_VIEWS = [
   { id: "progress", label: "Progress", icon: Activity },
   { id: "learn", label: "Learn", icon: BookOpen },
   { id: "account", label: "Account", icon: UserRound },
+  { id: "privacy", label: "Privacy", icon: ShieldCheck },
 ];
 
 function initialView() {
@@ -876,7 +878,7 @@ export default function App() {
         <section className="view-intro">
           <p className="eyebrow">FemmeVoice</p>
           <h1>{APP_VIEWS.find((view) => view.id === activeView)?.label}</h1>
-          <p>{activeView === "practice" ? "One calm exercise at a time. Stop any time your voice stops feeling easy." : activeView === "progress" ? "Your practice history, range notes, and gentle next steps." : activeView === "learn" ? "Simple explanations first, then deeper resources whenever you want them." : "Your private FemmeVoice account, preferences, and safety information."}</p>
+          <p>{activeView === "practice" ? "One calm exercise at a time. Stop any time your voice stops feeling easy." : activeView === "progress" ? "Your practice history, range notes, and gentle next steps." : activeView === "learn" ? "Simple explanations first, then deeper resources whenever you want them." : activeView === "privacy" ? "A plain-language account of what FemmeVoice stores, why, and how you stay in control." : "Your private FemmeVoice account, preferences, and safety information."}</p>
         </section>
       )}
 
@@ -1379,18 +1381,23 @@ export default function App() {
         </article>
       </section>
 
-      <section className="privacy-policy" id="privacy">
-        <p className="eyebrow">Privacy and safety</p>
-        <h2>Your voice stays yours.</h2>
-        <div className="privacy-grid">
-          <article><h3>Microphone</h3><p>Pitch analysis runs in your browser. FemmeVoice does not upload or store raw microphone audio.</p></article>
-          <article><h3>Account</h3><p>Accounts use a username and a slow, salted passphrase hash. Your passphrase is never stored or visible to us.</p></article>
-          <article><h3>Progress</h3><p>When sync is enabled, we store practice progress, preferences, and a device identifier so the app can remember your training.</p></article>
-          <article><h3>Boundaries</h3><p>No advertising profile, biometric voiceprint, or sale of personal data. This is not medical diagnosis or speech therapy.</p></article>
-        </div>
-        <p className="privacy-note">We use your account and progress to provide sync, on the basis of performing the service you ask for. FemmeVoice does not use advertising, profiling, or automated decisions. Data stays until you delete it. Use a unique passphrase of at least 15 characters. Stop practice if your voice hurts, feels scratchy, or stays fatigued. Password recovery is intentionally unavailable until verified recovery can be implemented safely.</p>
-      </section>
+      <button className="account-link privacy-link" onClick={() => navigateTo("privacy")}>Read the full privacy policy</button>
       </>}
+
+      {activeView === "privacy" && <section className="privacy-page" aria-label="FemmeVoice privacy policy">
+        <div className="privacy-policy-heading"><ShieldCheck /><div><p className="eyebrow">Privacy policy</p><h2>Your voice stays yours.</h2><p>Effective 15 July 2026. FemmeVoice is a practice companion, not a diagnostic or therapy service.</p></div></div>
+        <div className="privacy-grid">
+          <article><h3>Controller & contact</h3><p>Emilia Vuorenmaa is the controller for FemmeVoice. Contact: <a href="mailto:emilia@luova.club">emilia@luova.club</a>.</p></article>
+          <article><h3>What we collect</h3><p>Username, salted passphrase hash, optional verified recovery email, device identifier, practice progress, preferences, and limited security/session data.</p></article>
+          <article><h3>Microphone & audio</h3><p>Pitch analysis happens in your browser. FemmeVoice does not upload or store raw microphone audio, voiceprints, or recordings.</p></article>
+          <article><h3>Why we use it</h3><p>To provide the account, sync progress, protect the service, and send an email verification when you explicitly request one. We do not use ads, sell data, or profile users.</p></article>
+          <article><h3>Legal basis & retention</h3><p>We process account and progress data to provide the service you ask for. Account data remains until you delete it; security logs are retained only as long as necessary for security and operations.</p></article>
+          <article><h3>Your choices</h3><p>From Account, you can export or permanently delete your FemmeVoice data. You can also ask for access, correction, restriction, portability, or object to processing through the contact above.</p></article>
+          <article><h3>Who receives data</h3><p>Only infrastructure providers needed to host FemmeVoice and store its database process data for us. We do not disclose it for marketing.</p></article>
+          <article><h3>Security</h3><p>We use HTTPS, secure session cookies, CSRF protection, password hashing, access controls, and data minimisation. No security measure is absolute; report a concern through the security policy in the public repository.</p></article>
+        </div>
+        <p className="privacy-note">You may lodge a complaint with your local data-protection authority. In Finland, this is the Office of the Data Protection Ombudsman.</p>
+      </section>}
 
       {accountMode && (
         <div className="account-modal" role="dialog" aria-modal="true" aria-labelledby="account-title">
