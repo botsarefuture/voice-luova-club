@@ -13,6 +13,7 @@ from pathlib import Path
 from bson import ObjectId
 from flask import Flask, Response, jsonify, redirect, request, send_from_directory, session
 from gridfs import GridFSBucket
+from gridfs.errors import NoFile
 from pymongo import ASCENDING, MongoClient
 from pymongo.errors import DuplicateKeyError, PyMongoError
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -397,15 +398,19 @@ def delete_personal_data():
     user = user_from_request()
     if not user:
         return auth_error("Sign in to delete your data.", 401)
+    recordings = list(recordings_collection.find({"user_id": user["id"]}))
+    try:
+        for recording in recordings:
+            try:
+                recordings_bucket.delete(recording["file_id"])
+            except NoFile:
+                pass
+    except Exception:
+        return auth_error("We could not delete every private recording. Nothing else was deleted; please try again.", 503)
     legacy_key = f"luovaauth:{user['username']}"
     progress_collection.delete_many({"storage_key": {"$in": [user["key"], legacy_key]}})
     legacy_progress_collection.delete_many({"storage_key": legacy_key})
     feedback_collection.delete_many({"user_id": user["id"]})
-    for recording in recordings_collection.find({"user_id": user["id"]}):
-        try:
-            recordings_bucket.delete(recording["file_id"])
-        except Exception:
-            pass
     recordings_collection.delete_many({"user_id": user["id"]})
     users_collection.delete_one({"_id": ObjectId(user["id"])})
     session.clear()
@@ -474,6 +479,7 @@ def upload_recording():
     usage = sum(recording.get("byte_size", 0) for recording in recordings_collection.find({"user_id": user["id"]}, {"byte_size": 1}))
     if usage + len(encrypted_bytes) > FREE_RECORDING_LIMIT_BYTES:
         return auth_error("Your free private vault has reached its 100 MB limit. Delete a recording or choose not to save this take.", 413)
+    file_id = None
     try:
         file_id = recordings_bucket.upload_from_stream(recording_id, encrypted_bytes, metadata={"user_id": user["id"]})
         document = {
@@ -483,8 +489,15 @@ def upload_recording():
         }
         recordings_collection.insert_one(document)
     except DuplicateKeyError:
+        if file_id:
+            recordings_bucket.delete(file_id)
         return auth_error("That recording is already saved.", 409)
     except Exception:
+        if file_id:
+            try:
+                recordings_bucket.delete(file_id)
+            except Exception:
+                pass
         return auth_error("We could not save that private recording.", 503)
     return jsonify({"recording": {key: value for key, value in document.items() if key not in {"_id", "file_id", "user_id"}}})
 
@@ -514,12 +527,16 @@ def delete_recording(recording_id):
     user = user_from_request()
     if not user:
         return auth_error("Sign in to delete private recordings.", 401)
-    record = recordings_collection.find_one_and_delete({"user_id": user["id"], "recording_id": recording_id})
-    if record:
-        try:
-            recordings_bucket.delete(record["file_id"])
-        except Exception:
-            pass
+    record = recordings_collection.find_one({"user_id": user["id"], "recording_id": recording_id})
+    if not record:
+        return jsonify({"ok": True})
+    try:
+        recordings_bucket.delete(record["file_id"])
+    except NoFile:
+        pass
+    except Exception:
+        return auth_error("We could not delete that private recording. Please try again.", 503)
+    recordings_collection.delete_one({"_id": record["_id"]})
     return jsonify({"ok": True})
 
 

@@ -23,6 +23,8 @@ export function loadTodaySession() {
     seconds: 0,
     breakAcknowledged: [],
     voiceCheck: "unset",
+    guidedStep: "warmup",
+    guidedCompleted: false,
   };
 }
 

@@ -316,6 +316,7 @@ export default function App() {
   const recordingChunksRef = useRef([]);
   const recordingStartedAtRef = useRef(null);
   const playbackUrlRef = useRef(null);
+  const playbackAudioRef = useRef(null);
   const discardRecordingRef = useRef(false);
   const vaultKeyRef = useRef(null);
 
@@ -340,6 +341,10 @@ export default function App() {
   );
   const currentMidi = current.frequency ? frequencyToMidi(current.frequency) : null;
   const currentCents = current.frequency ? centsOff(current.frequency, targetFrequency) : null;
+  const visualRangeMaxMidi = showExtendedRange ? 77 : 61;
+  const visualRangePosition = Math.max(2, Math.min(98, ((currentMidi ?? 54) - 48) / (visualRangeMaxMidi - 48) * 100));
+  const visualRangeLow = Math.max(0, Math.min(100, ((dailySession.lowMidi ?? 54) - 48) / (visualRangeMaxMidi - 48) * 100));
+  const visualRangeHigh = Math.max(0, Math.min(100, ((dailySession.highMidi ?? dailySession.lowMidi ?? 54) - 48) / (visualRangeMaxMidi - 48) * 100));
   const sessionStats = useMemo(() => summarizeSession(history, current, dailySession), [history, current, dailySession]);
   const progressStats = useMemo(() => summarizeProgress(progress), [progress]);
   const dailyComparison = useMemo(
@@ -497,6 +502,7 @@ export default function App() {
   useEffect(() => () => {
     stopListening();
     stopTone();
+    playbackAudioRef.current?.pause();
     if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current);
   }, []);
 
@@ -553,6 +559,15 @@ export default function App() {
     setAttemptProgress(0);
   }
 
+  function lockPrivateVault() {
+    playbackAudioRef.current?.pause();
+    playbackAudioRef.current = null;
+    if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current);
+    playbackUrlRef.current = null;
+    vaultKeyRef.current = null;
+    setPlayingRecording(null);
+  }
+
   async function unlockPrivateVault(event) {
     event.preventDefault();
     if (!authInfo.user?.username || !vaultPassphrase) return;
@@ -597,8 +612,9 @@ export default function App() {
           setVaultStatus("Encrypting and saving your recording...");
           const mimeType = recorder.mimeType || "audio/webm";
           const blob = new Blob(recordingChunksRef.current, { type: mimeType });
-          const { ciphertext, iv } = await encryptRecording(blob, vaultKeyRef.current);
-          const recording = { id: crypto.randomUUID(), label: `${activePractice.label} - ${new Date().toLocaleDateString()}`, durationMs, mimeType, iv };
+          const recording = { id: crypto.randomUUID(), label: `${activePractice.label} - ${new Date().toLocaleDateString()}`, durationMs, mimeType };
+          const { ciphertext, iv } = await encryptRecording(blob, vaultKeyRef.current, recordingAad(authInfo.user.username, recording.id, mimeType));
+          recording.iv = iv;
           const saved = await uploadPrivateRecording(recording, ciphertext);
           setSavedRecordings((recordings) => [saved.recording, ...recordings]);
           setVaultUsage((usage) => ({ ...usage, used: usage.used + ciphertext.size }));
@@ -635,10 +651,12 @@ export default function App() {
     try {
       setPlayingRecording(recording.id);
       const encrypted = await downloadPrivateRecording(recording.recording_id || recording.id);
-      const blob = await decryptRecording(encrypted.ciphertext, encrypted.iv, encrypted.mimeType, vaultKeyRef.current);
+      const recordingId = recording.recording_id || recording.id;
+      const blob = await decryptRecording(encrypted.ciphertext, encrypted.iv, encrypted.mimeType, vaultKeyRef.current, recordingAad(authInfo.user.username, recordingId, encrypted.mimeType));
       if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current);
       playbackUrlRef.current = URL.createObjectURL(blob);
       const audio = new Audio(playbackUrlRef.current);
+      playbackAudioRef.current = audio;
       audio.onended = () => setPlayingRecording(null);
       await audio.play();
     } catch (error) {
@@ -775,7 +793,7 @@ export default function App() {
   }
 
   function resetDay() {
-    const reset = { date: dayKey(), lowMidi: null, highMidi: null, attempts: [], minutes: 0, seconds: 0, breakAcknowledged: [], voiceCheck: "unset" };
+    const reset = { date: dayKey(), lowMidi: null, highMidi: null, attempts: [], minutes: 0, seconds: 0, breakAcknowledged: [], voiceCheck: "unset", guidedStep: "warmup", guidedCompleted: false };
     setDailySession(reset);
     saveTodaySession(reset);
     setHistory([]);
@@ -833,10 +851,24 @@ export default function App() {
     setActiveStep(stepId);
     setExerciseMode(STEP_MODES[stepId] ?? "comfort-ladder");
     setLastScore(null);
+    if (practiceStyle === "guided") setDailySession((session) => ({ ...session, guidedStep: stepId, guidedCompleted: false }));
+  }
+
+  function enterGuidedPractice() {
+    const stepId = dailySession.guidedCompleted ? "warmup" : (dailySession.guidedStep ?? "warmup");
+    setPracticeStyle("guided");
+    setActiveStep(stepId);
+    setExerciseMode(STEP_MODES[stepId] ?? "comfort-ladder");
+    setLastScore(null);
+    setDailySession((session) => ({ ...session, guidedStep: stepId, guidedCompleted: false }));
   }
 
   function advancePracticeStep() {
     const currentIndex = PRACTICE_FLOW.findIndex((step) => step.id === activeStep);
+    if (practiceStyle === "guided" && activeStep === "cooldown") {
+      setDailySession((session) => ({ ...session, guidedStep: "cooldown", guidedCompleted: true }));
+      return;
+    }
     const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % PRACTICE_FLOW.length;
     selectPracticeStep(PRACTICE_FLOW[nextIndex].id);
   }
@@ -878,7 +910,7 @@ export default function App() {
       await logoutAccount();
     } finally {
       setAuthInfo({ authenticated: false, user: null });
-      vaultKeyRef.current = null;
+      lockPrivateVault();
     }
   }
 
@@ -904,6 +936,7 @@ export default function App() {
       setPrivacyStatus("");
       await deleteAccount();
       setAuthInfo({ authenticated: false, user: null });
+      lockPrivateVault();
       setPrivacyStatus("Your FemmeVoice account and synced data were deleted.");
     } catch (error) {
       setPrivacyStatus(error.message);
@@ -1172,9 +1205,9 @@ export default function App() {
       <section className="focus-picker" aria-label="Choose a practice focus">
         <div><p className="eyebrow">Choose one small thing</p><h2>What would feel useful today?</h2></div>
         <div className="focus-options">
-          <button onClick={() => { selectPracticeStep("warmup"); navigateTo("practice"); }}><HeartPulse /><strong>Feel easier</strong><span>Soft hums and gentle resets.</span></button>
-          <button onClick={() => { selectPracticeStep("pitch"); navigateTo("practice"); }}><Music2 /><strong>Explore pitch</strong><span>Small, forgiving steps by ear.</span></button>
-          <button onClick={() => { selectPracticeStep("speech"); navigateTo("practice"); }}><Waves /><strong>Use a phrase</strong><span>Bring one sound into real speech.</span></button>
+          <button onClick={() => { setPracticeStyle("guided"); selectPracticeStep("warmup"); navigateTo("practice"); }}><HeartPulse /><strong>Feel easier</strong><span>Soft hums and gentle resets.</span></button>
+          <button onClick={() => { setPracticeStyle("guided"); selectPracticeStep("pitch"); navigateTo("practice"); }}><Music2 /><strong>Explore pitch</strong><span>Small, forgiving steps by ear.</span></button>
+          <button onClick={() => { setPracticeStyle("guided"); selectPracticeStep("speech"); navigateTo("practice"); }}><Waves /><strong>Use a phrase</strong><span>Bring one sound into real speech.</span></button>
         </div>
       </section>
       </>}
@@ -1184,7 +1217,7 @@ export default function App() {
       <section className="practice-style-picker" aria-label="Practice style">
         <div><p className="eyebrow">Practice style</p><h2>{practiceStyle === "guided" ? "Let FemmeVoice lead" : "Make the session your own"}</h2></div>
         <div role="group" aria-label="Choose practice style">
-          <button className={practiceStyle === "guided" ? "selected" : ""} onClick={() => setPracticeStyle("guided")} aria-pressed={practiceStyle === "guided"}>Guided</button>
+          <button className={practiceStyle === "guided" ? "selected" : ""} onClick={enterGuidedPractice} aria-pressed={practiceStyle === "guided"}>Guided</button>
           <button className={practiceStyle === "free" ? "selected" : ""} onClick={() => setPracticeStyle("free")} aria-pressed={practiceStyle === "free"}>Free practice</button>
         </div>
       </section>
@@ -1339,10 +1372,16 @@ export default function App() {
               </div>
               <p>{activePractice.prompt}</p>
               <button className="next-stage" onClick={advancePracticeStep}>
-                {activeStageExercise.nextLabel} <ChevronRight />
+                {practiceStyle === "guided" && activeStep === "cooldown" ? "Finish today" : activeStageExercise.nextLabel} <ChevronRight />
               </button>
             </section>
           )}
+
+          {practiceStyle === "guided" && dailySession.guidedCompleted && <section className="guided-complete" aria-label="Guided practice complete">
+            <CheckCircle2 />
+            <div><strong>That is enough for today.</strong><span>Your voice has had a complete gentle round. Keep the easy feeling, drink some water, and come back another day.</span></div>
+            <button onClick={() => { setDailySession((session) => ({ ...session, guidedCompleted: false, guidedStep: "warmup" })); setActiveStep("warmup"); setExerciseMode("comfort-ladder"); }}>Start another round</button>
+          </section>}
 
           <div className="practice-principles" aria-label="Training principles">
             <div><strong>Listen first</strong><span>Try a sound, notice its colour, then try a small change.</span></div>
@@ -1377,13 +1416,20 @@ export default function App() {
 
           {practiceStyle === "free" && <canvas ref={canvasRef} width="980" height="340" aria-label="Pitch trace against the exercise target" />}
 
-          {practiceStyle === "free" && <div className="range-map" aria-label="Pitch reference range map">
+          <div className={practiceStyle === "guided" ? "range-map guided-range-map" : "range-map"} aria-label="Pitch reference range map">
             <div className="range-map-heading">
               <div>
-                <p className="eyebrow">Pitch reference map</p>
-                <h3>Use the colours to orient yourself, not to grade yourself.</h3>
+                <p className="eyebrow">{practiceStyle === "guided" ? "Your pitch map" : "Pitch reference map"}</p>
+                <h3>{practiceStyle === "guided" ? "A gentle picture of today’s voice range." : "Use the colours to orient yourself, not to grade yourself."}</h3>
               </div>
               <span>{gentleDisplay ? "Your own map" : showExtendedRange ? "C3 - F5" : "C3 - C#4"}</span>
+            </div>
+            <div className="range-live-track" style={{ "--range-position": `${visualRangePosition}%`, "--range-low": `${Math.min(visualRangeLow, visualRangeHigh)}%`, "--range-width": `${Math.max(1.2, Math.abs(visualRangeHigh - visualRangeLow))}%` }} aria-label={currentMidi === null ? "Waiting for a steady voice sound" : `Live pitch: ${gentleDisplay ? "detected" : midiToNoteName(currentMidi)}`}>
+              <i className="range-track-blue" />
+              <i className="range-track-gray" />
+              <i className="range-track-pink" />
+              {(dailySession.lowMidi !== null || dailySession.highMidi !== null) && <i className="range-today-window" />}
+              <span className={currentMidi === null ? "range-live-dot waiting" : "range-live-dot"} />
             </div>
             <div className="range-map-legend">
               <span className="range-band blue"><b>{gentleDisplay ? "Lower" : "C3 - C#3"}</b> Lower reference</span>
@@ -1391,8 +1437,8 @@ export default function App() {
               <span className="range-band pink"><b>{gentleDisplay ? "Lighter" : "F#3 - C#4"}</b> Light exploration</span>
               {showExtendedRange && <span className="range-band violet"><b>{gentleDisplay ? "Extended" : "D4 - F5"}</b> Optional exploration</span>}
             </div>
-            <p>Every voice has its own comfortable range. These bands are a visual guide for exploration, not a promise about what you should sound like or reach.</p>
-          </div>}
+            <p>{practiceStyle === "guided" ? "The dot moves when FemmeVoice hears a steady sound. No colour is better than another; this just shows where your voice is today." : "Every voice has its own comfortable range. These bands are a visual guide for exploration, not a promise about what you should sound like or reach."}</p>
+          </div>
 
           <div className="micro-drills" aria-label={`${activePractice.label} practice prompts`}>
             {activeStageExercise.cards.map((card, index) => (
@@ -1650,10 +1696,10 @@ export default function App() {
         <div className="privacy-grid">
           <article><h3>Controller & contact</h3><p>Emilia Vuorenmaa is the controller for FemmeVoice. Contact: <a href="mailto:emilia@luova.club">emilia@luova.club</a>.</p></article>
           <article><h3>What we collect</h3><p>Username, salted passphrase hash, optional verified recovery email, device identifier, practice progress, preferences, and limited security/session data.</p></article>
-          <article><h3>Microphone & audio</h3><p>Pitch analysis happens in your browser. FemmeVoice does not upload audio by default. When you explicitly save a private recording, it is encrypted in your browser before upload; our server stores only the encrypted file and cannot play it.</p></article>
+          <article><h3>Microphone & audio</h3><p>Pitch analysis happens in your browser. FemmeVoice does not upload audio by default. When you explicitly save a private recording, it is encrypted in your browser before upload. We store encrypted audio plus the label, date, duration, file type, size, and technical encryption information needed to retrieve it; we cannot play the audio.</p></article>
           <article><h3>Why we use it</h3><p>To provide the account, sync progress, protect the service, and send an email verification when you explicitly request one. We do not use ads, sell data, or profile users.</p></article>
           <article><h3>Legal basis & retention</h3><p>We process account and progress data to provide the service you ask for. Account data remains until you delete it; security logs are retained only as long as necessary for security and operations.</p></article>
-          <article><h3>Your choices</h3><p>You decide whether to save each recording or discard it. From Account, you can export or permanently delete your FemmeVoice data. Private recordings can be deleted individually or with your account.</p></article>
+          <article><h3>Your choices</h3><p>You decide whether to save each recording or discard it. From Account, you can export account and progress data or permanently delete your FemmeVoice data. Private recordings can be deleted individually or with your account.</p></article>
           <article><h3>Who receives data</h3><p>Only infrastructure providers needed to host FemmeVoice and store its database process data for us. We do not disclose it for marketing.</p></article>
           <article><h3>Security</h3><p>We use HTTPS, secure session cookies, CSRF protection, password hashing, access controls, and data minimisation. No security measure is absolute; report a concern through the security policy in the public repository.</p></article>
         </div>
@@ -1795,6 +1841,10 @@ function formatSessionTime(seconds) {
 function formatStorage(bytes) {
   if (bytes < 1024 * 1024) return `${Math.max(0, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+}
+
+function recordingAad(username, recordingId, mimeType) {
+  return `femmevoice-private-recording:v1:${username}:${recordingId}:${mimeType}`;
 }
 
 function buildSessionPlan(tier, seconds) {
