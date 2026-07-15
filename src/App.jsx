@@ -612,7 +612,7 @@ export default function App() {
           setVaultStatus("Encrypting and saving your recording...");
           const mimeType = recorder.mimeType || "audio/webm";
           const blob = new Blob(recordingChunksRef.current, { type: mimeType });
-          const recording = { id: crypto.randomUUID(), label: `${activePractice.label} - ${new Date().toLocaleDateString()}`, durationMs, mimeType };
+          const recording = { id: crypto.randomUUID(), label: `${activePractice.label} - ${new Date().toLocaleDateString()}`, durationMs, mimeType, encryptionVersion: 2 };
           const { ciphertext, iv } = await encryptRecording(blob, vaultKeyRef.current, recordingAad(authInfo.user.username, recording.id, mimeType));
           recording.iv = iv;
           const saved = await uploadPrivateRecording(recording, ciphertext);
@@ -649,10 +649,10 @@ export default function App() {
       return;
     }
     try {
-      setPlayingRecording(recording.id);
-      const encrypted = await downloadPrivateRecording(recording.recording_id || recording.id);
       const recordingId = recording.recording_id || recording.id;
-      const blob = await decryptRecording(encrypted.ciphertext, encrypted.iv, encrypted.mimeType, vaultKeyRef.current, recordingAad(authInfo.user.username, recordingId, encrypted.mimeType));
+      setPlayingRecording(recordingId);
+      const encrypted = await downloadPrivateRecording(recordingId);
+      const blob = await decryptRecording(encrypted.ciphertext, encrypted.iv, encrypted.mimeType, vaultKeyRef.current, recording.encryption_version >= 2 ? recordingAad(authInfo.user.username, recordingId, encrypted.mimeType) : undefined);
       if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current);
       playbackUrlRef.current = URL.createObjectURL(blob);
       const audio = new Audio(playbackUrlRef.current);

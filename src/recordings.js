@@ -14,11 +14,13 @@ export async function deriveRecordingKey(passphrase, username) {
 
 export async function encryptRecording(blob, key, aad) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: encoder.encode(aad) }, key, await blob.arrayBuffer());
+  const algorithm = { name: "AES-GCM", iv, ...(aad ? { additionalData: encoder.encode(aad) } : {}) };
+  const ciphertext = await crypto.subtle.encrypt(algorithm, key, await blob.arrayBuffer());
   return { ciphertext: new Blob([ciphertext], { type: "application/octet-stream" }), iv: Array.from(iv) };
 }
 
 export async function decryptRecording(ciphertext, iv, mimeType, key, aad) {
-  const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(iv), additionalData: encoder.encode(aad) }, key, await ciphertext.arrayBuffer());
+  const algorithm = { name: "AES-GCM", iv: new Uint8Array(iv), ...(aad ? { additionalData: encoder.encode(aad) } : {}) };
+  const plaintext = await crypto.subtle.decrypt(algorithm, key, await ciphertext.arrayBuffer());
   return new Blob([plaintext], { type: mimeType });
 }

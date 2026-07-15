@@ -108,6 +108,7 @@ export async function uploadPrivateRecording(recording, ciphertext) {
   form.append("label", recording.label);
   form.append("duration_ms", String(recording.durationMs));
   form.append("mime_type", recording.mimeType);
+  form.append("encryption_version", String(recording.encryptionVersion));
   form.append("iv", JSON.stringify(recording.iv));
   const response = await fetch("/api/recordings", { method: "POST", headers: { "X-CSRF-Token": token }, body: form });
   if (!response.ok) {

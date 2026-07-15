@@ -464,7 +464,8 @@ def upload_recording():
         uuid.UUID(recording_id)
         duration_ms = max(0, min(int(request.form.get("duration_ms", "0")), 10 * 60 * 1000))
         iv = request.form.get("iv", "")
-        if len(iv) > 180 or not label:
+        encryption_version = int(request.form.get("encryption_version", "1"))
+        if len(iv) > 180 or not label or encryption_version not in {1, 2}:
             raise ValueError
     except (ValueError, TypeError):
         return auth_error("That recording information is invalid.")
@@ -485,7 +486,7 @@ def upload_recording():
         document = {
             "user_id": user["id"], "recording_id": recording_id, "file_id": file_id,
             "label": label, "duration_ms": duration_ms, "mime_type": mime_type,
-            "iv": iv, "byte_size": len(encrypted_bytes), "created_at": now_iso(),
+            "iv": iv, "encryption_version": encryption_version, "byte_size": len(encrypted_bytes), "created_at": now_iso(),
         }
         recordings_collection.insert_one(document)
     except DuplicateKeyError:
