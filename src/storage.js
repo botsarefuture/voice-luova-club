@@ -25,6 +25,7 @@ export function loadTodaySession() {
     voiceCheck: "unset",
     guidedStep: "warmup",
     guidedCompleted: false,
+    reflections: [],
   };
 }
 
@@ -67,6 +68,7 @@ export function mergeTodayIntoProgress(progress, session, preferences) {
     bestScore: bestAttempt?.score ?? null,
     bestNote: bestAttempt?.targetNote ?? null,
     minutes: session.minutes,
+    comfort: session.reflections?.at(-1)?.rating ?? null,
   };
   const days = [
     today,
@@ -74,7 +76,7 @@ export function mergeTodayIntoProgress(progress, session, preferences) {
   ]
     .filter((day) => day.attempts > 0 || day.lowMidi !== null || day.highMidi !== null)
     .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 60);
+    .slice(0, 365);
 
   return normalizeProgress({
     ...normalized,
@@ -94,6 +96,7 @@ export function mergeTodayIntoProgress(progress, session, preferences) {
     showExtendedRange: preferences.showExtendedRange ?? normalized.showExtendedRange,
     gentleDisplay: preferences.gentleDisplay ?? normalized.gentleDisplay,
     autoRecordConsent: preferences.autoRecordConsent ?? normalized.autoRecordConsent,
+    trainingGoal: preferences.trainingGoal ?? normalized.trainingGoal,
     practiceStyle: preferences.practiceStyle ?? normalized.practiceStyle,
     totalAttempts: days.reduce((sum, day) => sum + day.attempts, 0),
     totalPracticeDays: days.length,
@@ -117,6 +120,7 @@ function defaultProgress() {
     showExtendedRange: false,
     gentleDisplay: false,
     autoRecordConsent: false,
+    trainingGoal: "comfort",
     practiceStyle: "guided",
     totalAttempts: 0,
     totalPracticeDays: 0,
@@ -144,7 +148,7 @@ export function mergeProgressRecords(primary, secondary) {
   const days = [...daysByDate.values()]
     .filter((day) => day?.date)
     .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 60);
+    .slice(0, 365);
 
   const bestScoreSource = [first, second].sort((a, b) => (b.bestScore ?? -1) - (a.bestScore ?? -1))[0];
 
@@ -159,6 +163,7 @@ export function mergeProgressRecords(primary, secondary) {
     showExtendedRange: Boolean(first.showExtendedRange || second.showExtendedRange),
     gentleDisplay: Boolean(first.gentleDisplay || second.gentleDisplay),
     autoRecordConsent: first.autoRecordConsent ?? second.autoRecordConsent ?? false,
+    trainingGoal: first.trainingGoal ?? second.trainingGoal ?? "comfort",
     totalAttempts: days.reduce((sum, day) => sum + (day.attempts ?? 0), 0),
     totalPracticeDays: days.length,
   });
@@ -176,6 +181,7 @@ function mergeDay(a, b) {
     bestScore: maxDefined(a.bestScore, b.bestScore),
     bestNote: best.bestNote ?? a.bestNote ?? b.bestNote ?? null,
     minutes: Math.max(a.minutes ?? 0, b.minutes ?? 0),
+    comfort: b.comfort ?? a.comfort ?? null,
   };
 }
 

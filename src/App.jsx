@@ -225,6 +225,13 @@ const PRACTICE_TIERS = {
   },
 };
 
+const TRAINING_GOALS = {
+  comfort: { label: "Comfort & ease", detail: "Build an easy, sustainable voice first." },
+  flexibility: { label: "Flexibility", detail: "Explore more pitch movement and options." },
+  femininity: { label: "Feminine expression", detail: "Explore a voice presentation that feels more feminine to you." },
+  context: { label: "Everyday speaking", detail: "Carry a comfortable change into ordinary phrases." },
+};
+
 const RESOURCE_FILTERS = [
   { id: "start", label: "Start here" },
   { id: "foundations", label: "Foundations" },
@@ -294,6 +301,8 @@ export default function App() {
   const [showExtendedRange, setShowExtendedRange] = useState(() => loadProgress().showExtendedRange ?? false);
   const [gentleDisplay, setGentleDisplay] = useState(() => loadProgress().gentleDisplay ?? false);
   const [autoRecord, setAutoRecord] = useState(() => loadProgress().autoRecordConsent ?? false);
+  const [trainingGoal, setTrainingGoal] = useState(() => loadProgress().trainingGoal ?? "comfort");
+  const [targetMisses, setTargetMisses] = useState(0);
   const [practiceStyle, setPracticeStyle] = useState(() => loadProgress().practiceStyle ?? "guided");
   const [savedRecordings, setSavedRecordings] = useState([]);
   const [vaultRecording, setVaultRecording] = useState(false);
@@ -401,6 +410,7 @@ export default function App() {
       showExtendedRange,
       gentleDisplay,
       autoRecordConsent: autoRecord,
+      trainingGoal,
       practiceStyle,
     }));
   }, [dailySession]);
@@ -415,9 +425,10 @@ export default function App() {
       showExtendedRange,
       gentleDisplay,
       autoRecordConsent: autoRecord,
+      trainingGoal,
       practiceStyle,
     }));
-  }, [targetIndex, activeStep, exerciseMode, practiceTier, comfortAnchorMidi, showExtendedRange, gentleDisplay, autoRecord, practiceStyle]);
+  }, [targetIndex, activeStep, exerciseMode, practiceTier, comfortAnchorMidi, showExtendedRange, gentleDisplay, autoRecord, trainingGoal, practiceStyle]);
 
   useEffect(() => {
     saveProgress(progress);
@@ -451,6 +462,7 @@ export default function App() {
           setShowExtendedRange(merged.showExtendedRange ?? false);
           setGentleDisplay(merged.gentleDisplay ?? false);
           setAutoRecord(merged.autoRecordConsent ?? false);
+          setTrainingGoal(merged.trainingGoal ?? "comfort");
           setPracticeStyle(merged.practiceStyle ?? "guided");
         }
         setSyncStatus("synced");
@@ -755,12 +767,16 @@ export default function App() {
     setIsPlayingTone(true);
     const audioContext = new AudioContext();
     const oscillator = audioContext.createOscillator();
+    const formant = audioContext.createBiquadFilter();
     const gain = audioContext.createGain();
-    oscillator.type = activeStep === "warmup" ? "triangle" : "sine";
+    oscillator.type = activeStep === "warmup" ? "triangle" : "sawtooth";
     oscillator.frequency.value = targetFrequency;
+    formant.type = "bandpass";
+    formant.frequency.value = activeStep === "pitch" ? 1850 : 900;
+    formant.Q.value = 0.8;
     gain.gain.setValueAtTime(0, audioContext.currentTime);
-    gain.gain.linearRampToValueAtTime(0.16, audioContext.currentTime + 0.04);
-    oscillator.connect(gain).connect(audioContext.destination);
+    gain.gain.linearRampToValueAtTime(0.08, audioContext.currentTime + 0.04);
+    oscillator.connect(formant).connect(gain).connect(audioContext.destination);
     oscillator.start();
     toneRef.current = { audioContext, oscillator, gain };
   }
@@ -805,17 +821,32 @@ export default function App() {
       if (progressTimerRef.current) window.clearInterval(progressTimerRef.current);
       progressTimerRef.current = null;
       const result = scoreAttempt({ targetFrequency, samples: attemptSamplesRef.current });
-      const enriched = { ...result, mode: exerciseMode, step: activeStep, time: Date.now() };
+      const stepDown = !result.matched && activeStep === "pitch" && targetMisses >= 1 && targetIndex > 0;
+      const enriched = {
+        ...result,
+        mode: exerciseMode,
+        step: activeStep,
+        time: Date.now(),
+        adaptation: stepDown ? "This note is not ready today. FemmeVoice moved back one comfortable step." : null,
+      };
       setLastScore(enriched);
       setDailySession((session) => ({ ...session, attempts: [...session.attempts.slice(-17), enriched] }));
       if (result.matched && activeStep === "pitch") {
+        setTargetMisses(0);
         setTargetIndex((index) => Math.min(EXERCISE_STEPS.length - 1, index + 1));
+      } else if (activeStep === "pitch") {
+        if (stepDown) {
+          setTargetIndex((index) => Math.max(0, index - 1));
+          setTargetMisses(0);
+        } else {
+          setTargetMisses((misses) => misses + 1);
+        }
       }
     }, 3000);
   }
 
   function resetDay() {
-    const reset = { date: dayKey(), lowMidi: null, highMidi: null, attempts: [], minutes: 0, seconds: 0, breakAcknowledged: [], voiceCheck: "unset", guidedStep: "warmup", guidedCompleted: false };
+    const reset = { date: dayKey(), lowMidi: null, highMidi: null, attempts: [], minutes: 0, seconds: 0, breakAcknowledged: [], voiceCheck: "unset", guidedStep: "warmup", guidedCompleted: false, reflections: [] };
     setDailySession(reset);
     saveTodaySession(reset);
     setHistory([]);
@@ -851,6 +882,13 @@ export default function App() {
   function selectVoiceCheck(value) {
     setDailySession((session) => ({ ...session, voiceCheck: value }));
     if (value === "pain") selectPracticeStep("cooldown");
+  }
+
+  function reflectOnPractice(rating) {
+    setDailySession((session) => ({
+      ...session,
+      reflections: [...(session.reflections ?? []).slice(-7), { rating, time: Date.now() }],
+    }));
   }
 
   function nextHumDrill() {
@@ -1321,7 +1359,7 @@ export default function App() {
               title="Hold to hear the target tone"
             >
               <Volume2 />
-              {isPlayingTone ? "Release to stop" : "Hold to hear"}
+              {isPlayingTone ? "Release to stop" : "Hold reference"}
             </button>
             {activeStep !== "cooldown" && (
               <button className="primary-action" onClick={beginAttempt} disabled={recordingAttempt}>
@@ -1462,9 +1500,15 @@ export default function App() {
                     ? `${lastScore.cents > 0 ? "+" : ""}${lastScore.cents} cents average on ${lastScore.targetNote}.`
                     : "Try a longer, steadier sound so the coach has enough data."}
                 </p>
+                {lastScore.adaptation && <p className="score-adaptation">{lastScore.adaptation}</p>}
               </div>
             </div>
           )}
+
+          {activeStep === "speech" && lastScore && <section className="self-reflection" aria-label="Your own practice reflection">
+            <div><p className="eyebrow">Your ears matter</p><h3>How did that phrase feel?</h3></div>
+            <div><button onClick={() => reflectOnPractice("easy")}>Easy</button><button onClick={() => reflectOnPractice("okay")}>Okay</button><button onClick={() => reflectOnPractice("effortful")}>Effortful</button></div>
+          </section>}
         </article>
 
         <aside className="coach-panel">
@@ -1479,6 +1523,7 @@ export default function App() {
           <div className="coach-readout">
             <Readout label="Mode" value={MODE_LABELS[exerciseMode]} />
             <Readout label="Goal" value={activePractice.target} />
+            <Readout label="Your focus" value={TRAINING_GOALS[trainingGoal].label} />
             <Readout label="Tier" value={`${activeTier.label} ${activeTier.minutes} min`} />
             <Readout label="Session" value={`${dailySession.attempts.length} scored repeats`} />
             <Readout label="Remembered target" value={gentleDisplay ? "Your last easy step" : midiToNoteName(rememberedTargetMidi)} />
@@ -1555,6 +1600,10 @@ export default function App() {
         <div className="history-bars" aria-label="Recent practice history">
           {progressStats.daysForChart.map((day) => <div className="history-day" key={day.date}><span style={{ height: `${day.height}%` }} /><small>{day.label}</small></div>)}
         </div>
+      </section>
+      <section className="range-history" aria-label="Dated voice range history">
+        <div><p className="eyebrow">Your range over time</p><h2>A dated record of what your voice reached.</h2><p>Only steady sounds held for at least a moment are included. It is a record, not a target.</p></div>
+        {progress.days.length ? <ol>{progress.days.map((day) => <li key={day.date}><time dateTime={day.date}>{formatHistoryDate(day.date)}</time><span>{day.highMidi === null ? "No stable high note saved" : `Highest stable pitch: ${midiToNoteName(day.highMidi)}`}</span><small>{day.lowMidi === null ? "" : `${midiToNoteName(day.lowMidi)} to ${midiToNoteName(day.highMidi)}${day.comfort ? ` · Felt ${day.comfort}` : ""}`}</small></li>)}</ol> : <p className="muted">Your dated range history begins after your first steady practice sound.</p>}
       </section>
       <section className="private-vault progress-vault" aria-label="Private recordings">
         <div>
@@ -1685,6 +1734,13 @@ export default function App() {
             {Object.entries(PRACTICE_TIERS).map(([id, tier]) => <button className={practiceTier === id ? "tier-option selected" : "tier-option"} key={id} onClick={() => setPracticeTier(id)} aria-pressed={practiceTier === id}><strong>{tier.label}</strong><span>{tier.minutes} min</span></button>)}
           </div>
           <p>{activeTier.description}</p>
+        </article>
+        <article>
+          <p className="eyebrow">Your intention</p>
+          <h3>What matters most right now?</h3>
+          <div className="goal-options">
+            {Object.entries(TRAINING_GOALS).map(([id, goal]) => <button className={trainingGoal === id ? "selected" : ""} key={id} onClick={() => setTrainingGoal(id)} aria-pressed={trainingGoal === id}><strong>{goal.label}</strong><span>{goal.detail}</span></button>)}
+          </div>
         </article>
         <article>
           <p className="eyebrow">Range & calibration</p>
@@ -1864,6 +1920,10 @@ function formatSessionTime(seconds) {
 function formatStorage(bytes) {
   if (bytes < 1024 * 1024) return `${Math.max(0, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+}
+
+function formatHistoryDate(date) {
+  return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "numeric", year: "numeric" }).format(new Date(`${date}T12:00:00`));
 }
 
 function recordingAad(username, recordingId, mimeType) {
