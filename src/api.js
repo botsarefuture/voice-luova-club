@@ -92,3 +92,41 @@ export async function requestEmailVerification(email) {
 export async function submitFeedback(payload) {
   return secureRequest("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
 }
+
+export async function listPrivateRecordings() {
+  const response = await fetch("/api/recordings", { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error("Could not load private recordings.");
+  const payload = await response.json();
+  return payload;
+}
+
+export async function uploadPrivateRecording(recording, ciphertext) {
+  const token = await getCsrfToken();
+  const form = new FormData();
+  form.append("audio", ciphertext, "encrypted-recording.bin");
+  form.append("id", recording.id);
+  form.append("label", recording.label);
+  form.append("duration_ms", String(recording.durationMs));
+  form.append("mime_type", recording.mimeType);
+  form.append("iv", JSON.stringify(recording.iv));
+  const response = await fetch("/api/recordings", { method: "POST", headers: { "X-CSRF-Token": token }, body: form });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || "Could not save your recording.");
+  }
+  return response.json();
+}
+
+export async function downloadPrivateRecording(id) {
+  const response = await fetch(`/api/recordings/${encodeURIComponent(id)}`, { headers: { Accept: "application/octet-stream" } });
+  if (!response.ok) throw new Error("Could not open that recording.");
+  return {
+    ciphertext: await response.blob(),
+    iv: JSON.parse(response.headers.get("X-FemmeVoice-IV") || "[]"),
+    mimeType: response.headers.get("X-FemmeVoice-Mime") || "audio/webm",
+  };
+}
+
+export async function removePrivateRecording(id) {
+  return secureRequest(`/api/recordings/${encodeURIComponent(id)}`, { method: "DELETE" });
+}

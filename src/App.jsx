@@ -4,6 +4,7 @@ import {
   BookOpen,
   Bot,
   CheckCircle2,
+  Circle,
   ChevronLeft,
   ChevronRight,
   Coffee,
@@ -15,6 +16,7 @@ import {
   Music2,
   PauseCircle,
   RotateCcw,
+  Trash2,
   Sparkles,
   Square,
   Target,
@@ -35,7 +37,7 @@ import {
   midiToNoteName,
   semitoneSpan,
 } from "./audio";
-import { deleteAccount, exportAccountData, loadCloudProgress, loadMe, loginAccount, logoutAccount, registerAccount, requestEmailVerification, saveCloudProgress, submitFeedback } from "./api";
+import { deleteAccount, downloadPrivateRecording, exportAccountData, listPrivateRecordings, loadCloudProgress, loadMe, loginAccount, logoutAccount, registerAccount, removePrivateRecording as deletePrivateRecording, requestEmailVerification, saveCloudProgress, submitFeedback, uploadPrivateRecording } from "./api";
 import { buildCoachTips, scoreAttempt } from "./coach";
 import {
   dayKey,
@@ -47,6 +49,7 @@ import {
   saveProgress,
   saveTodaySession,
 } from "./storage";
+import { decryptRecording, deriveRecordingKey, encryptRecording } from "./recordings";
 
 const EXERCISE_STEPS = [0, 1, 2, 3, 5, 7, 8, 10, 12];
 const DEFAULT_COMFORT_ANCHOR = 52;
@@ -61,6 +64,7 @@ const APP_VIEWS = [
   { id: "privacy", label: "Privacy", icon: ShieldCheck },
   { id: "feedback", label: "Feedback", icon: MessageCircle },
 ];
+const MAIN_VIEW_IDS = new Set(["today", "practice", "progress", "learn"]);
 
 function initialView() {
   const view = window.location.hash.replace("#", "");
@@ -289,6 +293,13 @@ export default function App() {
   const [resourceFilter, setResourceFilter] = useState("start");
   const [showExtendedRange, setShowExtendedRange] = useState(() => loadProgress().showExtendedRange ?? false);
   const [gentleDisplay, setGentleDisplay] = useState(() => loadProgress().gentleDisplay ?? false);
+  const [practiceStyle, setPracticeStyle] = useState(() => loadProgress().practiceStyle ?? "guided");
+  const [savedRecordings, setSavedRecordings] = useState([]);
+  const [vaultRecording, setVaultRecording] = useState(false);
+  const [vaultStatus, setVaultStatus] = useState("");
+  const [playingRecording, setPlayingRecording] = useState(null);
+  const [vaultPassphrase, setVaultPassphrase] = useState("");
+  const [vaultUsage, setVaultUsage] = useState({ used: 0, limit: 100 * 1024 * 1024 });
 
   const audioRef = useRef(null);
   const canvasRef = useRef(null);
@@ -301,6 +312,12 @@ export default function App() {
   const lastTimerFrameRef = useRef(null);
   const progressTimerRef = useRef(null);
   const cloudLoadedRef = useRef(false);
+  const mediaRecorderRef = useRef(null);
+  const recordingChunksRef = useRef([]);
+  const recordingStartedAtRef = useRef(null);
+  const playbackUrlRef = useRef(null);
+  const discardRecordingRef = useRef(false);
+  const vaultKeyRef = useRef(null);
 
   const targetMidi = useMemo(() => {
     if (exerciseMode === "resonance-step" && dailySession.highMidi !== null) {
@@ -376,6 +393,7 @@ export default function App() {
       comfortAnchorMidi,
       showExtendedRange,
       gentleDisplay,
+      practiceStyle,
     }));
   }, [dailySession]);
 
@@ -388,8 +406,9 @@ export default function App() {
       comfortAnchorMidi,
       showExtendedRange,
       gentleDisplay,
+      practiceStyle,
     }));
-  }, [targetIndex, activeStep, exerciseMode, practiceTier, comfortAnchorMidi, showExtendedRange, gentleDisplay]);
+  }, [targetIndex, activeStep, exerciseMode, practiceTier, comfortAnchorMidi, showExtendedRange, gentleDisplay, practiceStyle]);
 
   useEffect(() => {
     saveProgress(progress);
@@ -422,6 +441,7 @@ export default function App() {
           setComfortAnchorMidi(merged.comfortAnchorMidi ?? null);
           setShowExtendedRange(merged.showExtendedRange ?? false);
           setGentleDisplay(merged.gentleDisplay ?? false);
+          setPracticeStyle(merged.practiceStyle ?? "guided");
         }
         setSyncStatus("synced");
       })
@@ -477,7 +497,19 @@ export default function App() {
   useEffect(() => () => {
     stopListening();
     stopTone();
+    if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current);
   }, []);
+
+  useEffect(() => {
+    if (!authInfo.authenticated) {
+      setSavedRecordings([]);
+      return;
+    }
+    listPrivateRecordings().then((vault) => {
+      setSavedRecordings(vault.recordings);
+      setVaultUsage({ used: vault.usage_bytes, limit: vault.limit_bytes });
+    }).catch(() => setVaultStatus("Private recordings are unavailable right now."));
+  }, [authInfo.authenticated]);
 
   async function startListening() {
     try {
@@ -509,6 +541,7 @@ export default function App() {
     progressTimerRef.current = null;
     lastTimerFrameRef.current = null;
     recordingRef.current = false;
+    if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
     const audio = audioRef.current;
     if (audio) {
       audio.stream.getTracks().forEach((track) => track.stop());
@@ -518,6 +551,112 @@ export default function App() {
     setListening(false);
     setRecordingAttempt(false);
     setAttemptProgress(0);
+  }
+
+  async function unlockPrivateVault(event) {
+    event.preventDefault();
+    if (!authInfo.user?.username || !vaultPassphrase) return;
+    try {
+      vaultKeyRef.current = await deriveRecordingKey(vaultPassphrase, authInfo.user.username);
+      setVaultPassphrase("");
+      setVaultStatus("Private vault unlocked for this visit.");
+    } catch (error) {
+      setVaultStatus(error.message);
+    }
+  }
+
+  async function startPrivateRecording() {
+    if (!authInfo.authenticated) {
+      setVaultStatus("Create an account or sign in before saving a private recording.");
+      navigateTo("account");
+      return;
+    }
+    if (!vaultKeyRef.current) {
+      setVaultStatus("Unlock your private vault with your FemmeVoice passphrase first.");
+      navigateTo("account");
+      return;
+    }
+    if (!listening && !await startListening()) return;
+    try {
+      const recorder = new MediaRecorder(audioRef.current.stream, { mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm" });
+      recordingChunksRef.current = [];
+      discardRecordingRef.current = false;
+      recordingStartedAtRef.current = Date.now();
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) recordingChunksRef.current.push(event.data);
+      };
+      recorder.onstop = async () => {
+        const durationMs = Date.now() - (recordingStartedAtRef.current ?? Date.now());
+        setVaultRecording(false);
+        if (discardRecordingRef.current) {
+          setVaultStatus("Recording discarded. Nothing was uploaded or saved.");
+          return;
+        }
+        if (!recordingChunksRef.current.length || !vaultKeyRef.current) return;
+        try {
+          setVaultStatus("Encrypting and saving your recording...");
+          const mimeType = recorder.mimeType || "audio/webm";
+          const blob = new Blob(recordingChunksRef.current, { type: mimeType });
+          const { ciphertext, iv } = await encryptRecording(blob, vaultKeyRef.current);
+          const recording = { id: crypto.randomUUID(), label: `${activePractice.label} - ${new Date().toLocaleDateString()}`, durationMs, mimeType, iv };
+          const saved = await uploadPrivateRecording(recording, ciphertext);
+          setSavedRecordings((recordings) => [saved.recording, ...recordings]);
+          setVaultUsage((usage) => ({ ...usage, used: usage.used + ciphertext.size }));
+          setVaultStatus("Saved privately to your encrypted FemmeVoice vault.");
+        } catch (error) {
+          setVaultStatus(error.message);
+        }
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setVaultRecording(true);
+      setVaultStatus("Recording privately. Stop whenever you are ready.");
+    } catch (error) {
+      setVaultStatus(error.message || "Could not start a private recording.");
+    }
+  }
+
+  function stopPrivateRecording() {
+    discardRecordingRef.current = false;
+    if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+  }
+
+  function discardPrivateRecording() {
+    discardRecordingRef.current = true;
+    if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+  }
+
+  async function playPrivateRecording(recording) {
+    if (!vaultKeyRef.current) {
+      setVaultStatus("Unlock your private vault with your FemmeVoice passphrase first.");
+      navigateTo("account");
+      return;
+    }
+    try {
+      setPlayingRecording(recording.id);
+      const encrypted = await downloadPrivateRecording(recording.recording_id || recording.id);
+      const blob = await decryptRecording(encrypted.ciphertext, encrypted.iv, encrypted.mimeType, vaultKeyRef.current);
+      if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current);
+      playbackUrlRef.current = URL.createObjectURL(blob);
+      const audio = new Audio(playbackUrlRef.current);
+      audio.onended = () => setPlayingRecording(null);
+      await audio.play();
+    } catch (error) {
+      setPlayingRecording(null);
+      setVaultStatus("Could not unlock that recording. Check that you used the same FemmeVoice passphrase.");
+    }
+  }
+
+  async function removePrivateRecording(recording) {
+    if (!window.confirm("Delete this private recording permanently?")) return;
+    try {
+      await deletePrivateRecording(recording.recording_id || recording.id);
+      setSavedRecordings((recordings) => recordings.filter((item) => (item.recording_id || item.id) !== (recording.recording_id || recording.id)));
+      setVaultUsage((usage) => ({ ...usage, used: Math.max(0, usage.used - (recording.byte_size || 0)) }));
+      setVaultStatus("Private recording deleted.");
+    } catch (error) {
+      setVaultStatus(error.message);
+    }
   }
 
   function tick() {
@@ -723,6 +862,8 @@ export default function App() {
         ? await registerAccount(accountForm)
         : await loginAccount(accountForm);
       setAuthInfo({ authenticated: true, user: result.user });
+      vaultKeyRef.current = await deriveRecordingKey(accountForm.password, result.user.username);
+      setVaultPassphrase("");
       setAccountMode(null);
       setAccountForm({ username: "", password: "", confirmation: "" });
     } catch (error) {
@@ -737,6 +878,7 @@ export default function App() {
       await logoutAccount();
     } finally {
       setAuthInfo({ authenticated: false, user: null });
+      vaultKeyRef.current = null;
     }
   }
 
@@ -890,7 +1032,7 @@ export default function App() {
           <strong>FemmeVoice</strong>
         </button>
         <nav className="app-nav" aria-label="Main navigation">
-          {APP_VIEWS.map((view) => {
+          {APP_VIEWS.filter((view) => MAIN_VIEW_IDS.has(view.id)).map((view) => {
             const Icon = view.icon;
             return (
               <button
@@ -1039,7 +1181,14 @@ export default function App() {
 
       {activeView === "practice" && <>
       {micError && <p className="alert">{micError}</p>}
-      <section className="practice-flow" aria-label="Practice flow">
+      <section className="practice-style-picker" aria-label="Practice style">
+        <div><p className="eyebrow">Practice style</p><h2>{practiceStyle === "guided" ? "Let FemmeVoice lead" : "Make the session your own"}</h2></div>
+        <div role="group" aria-label="Choose practice style">
+          <button className={practiceStyle === "guided" ? "selected" : ""} onClick={() => setPracticeStyle("guided")} aria-pressed={practiceStyle === "guided"}>Guided</button>
+          <button className={practiceStyle === "free" ? "selected" : ""} onClick={() => setPracticeStyle("free")} aria-pressed={practiceStyle === "free"}>Free practice</button>
+        </div>
+      </section>
+      {practiceStyle === "free" && <section className="practice-flow" aria-label="Practice flow">
         {PRACTICE_FLOW.map((step) => {
           const Icon = step.icon;
           const selected = step.id === activeStep;
@@ -1055,13 +1204,13 @@ export default function App() {
             </button>
           );
         })}
-      </section>
+      </section>}
 
       <section className="workspace">
         <article className="training-panel">
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">Guided practice</p>
+              <p className="eyebrow">{practiceStyle === "guided" ? "Your next small step" : "Free practice"}</p>
               <h2>{activePractice.title}</h2>
               <p>{activePractice.prompt}</p>
             </div>
@@ -1071,14 +1220,14 @@ export default function App() {
           </div>
 
           <div className="exercise-controls">
-            <label>
+            {practiceStyle === "free" && <label>
               Mode
               <select value={exerciseMode} onChange={(event) => selectExerciseMode(event.target.value)}>
                 <option value="comfort-ladder">Light pitch exploration</option>
                 <option value="resonance-step">Brightness exploration</option>
                 <option value="speech-floor">Speech transfer</option>
               </select>
-            </label>
+            </label>}
             <div className="target-chip">
               <span>{gentleDisplay ? "Reference" : "Target"}</span>
               <strong>{gentleDisplay ? "Easy next step" : midiToNoteName(targetMidi)}</strong>
@@ -1092,9 +1241,9 @@ export default function App() {
             >
               <RotateCcw />
             </button>
-            <button className="icon-action" onClick={() => moveTarget(-1)} disabled={targetIndex === 0} aria-label="Use an easier target" title="Use an easier target">
+            {practiceStyle === "free" && <button className="icon-action" onClick={() => moveTarget(-1)} disabled={targetIndex === 0} aria-label="Use an easier target" title="Use an easier target">
               <ChevronLeft />
-            </button>
+            </button>}
             <button
               className={isPlayingTone ? "tone-button playing" : "tone-button"}
               onPointerDown={(event) => {
@@ -1125,9 +1274,9 @@ export default function App() {
                 {recordingAttempt ? "Listening..." : activeStep === "speech" ? "Check 3-second phrase" : activeStep === "resonance" ? "Check pitch hold" : "Try 3-second match"}
               </button>
             )}
-            <button className="icon-action" onClick={() => moveTarget(1)} disabled={targetIndex === EXERCISE_STEPS.length - 1} aria-label="Try the next small step" title="Try the next small step">
+            {practiceStyle === "free" && <button className="icon-action" onClick={() => moveTarget(1)} disabled={targetIndex === EXERCISE_STEPS.length - 1} aria-label="Try the next small step" title="Try the next small step">
               <ChevronRight />
-            </button>
+            </button>}
           </div>
 
           <div className="coach-nudge">
@@ -1207,9 +1356,28 @@ export default function App() {
             </div>
           )}
 
-          <canvas ref={canvasRef} width="980" height="340" aria-label="Pitch trace against the exercise target" />
+          <section className="private-vault" aria-label="Private recordings">
+            <div>
+              <p className="eyebrow">Private voice notes</p>
+              <h3>Keep a few moments for yourself.</h3>
+              <p>Saved recordings are encrypted before upload and only unlock with your FemmeVoice passphrase.</p>
+              <small>{formatStorage(vaultUsage.used)} of {formatStorage(vaultUsage.limit)} free private space used</small>
+            </div>
+            <div className="vault-actions">
+              <button className={vaultRecording ? "primary-action" : "auth-action"} onClick={vaultRecording ? stopPrivateRecording : startPrivateRecording}>
+                {vaultRecording ? <Square /> : <Circle />}{vaultRecording ? "Stop and save" : "Record privately"}
+              </button>
+              {vaultRecording && <button className="auth-action" onClick={discardPrivateRecording}>Discard take</button>}
+              {vaultStatus && <p>{vaultStatus}</p>}
+            </div>
+            {savedRecordings.length > 0 && <div className="saved-recordings">
+              {savedRecordings.slice(0, 3).map((recording) => <div key={recording.recording_id || recording.id}><span><strong>{recording.label}</strong><small>{Math.max(1, Math.round(recording.duration_ms / 1000))} sec</small></span><button onClick={() => playPrivateRecording(recording)} disabled={playingRecording === (recording.recording_id || recording.id)}>{playingRecording === (recording.recording_id || recording.id) ? "Playing..." : "Play"}</button><button className="icon-action" onClick={() => removePrivateRecording(recording)} aria-label={`Delete ${recording.label}`}><Trash2 /></button></div>)}
+            </div>}
+          </section>
 
-          <div className="range-map" aria-label="Pitch reference range map">
+          {practiceStyle === "free" && <canvas ref={canvasRef} width="980" height="340" aria-label="Pitch trace against the exercise target" />}
+
+          {practiceStyle === "free" && <div className="range-map" aria-label="Pitch reference range map">
             <div className="range-map-heading">
               <div>
                 <p className="eyebrow">Pitch reference map</p>
@@ -1224,7 +1392,7 @@ export default function App() {
               {showExtendedRange && <span className="range-band violet"><b>{gentleDisplay ? "Extended" : "D4 - F5"}</b> Optional exploration</span>}
             </div>
             <p>Every voice has its own comfortable range. These bands are a visual guide for exploration, not a promise about what you should sound like or reach.</p>
-          </div>
+          </div>}
 
           <div className="micro-drills" aria-label={`${activePractice.label} practice prompts`}>
             {activeStageExercise.cards.map((card, index) => (
@@ -1394,6 +1562,10 @@ export default function App() {
           {!authInfo.authenticated && <a className="migration-link" href="/api/auth/migration">Transfer an existing training account before 1 Aug 2026</a>}
         </div>
       </section>
+      <div className="account-shortcuts" aria-label="Account help and privacy">
+        <button onClick={() => navigateTo("feedback")}><MessageCircle /> Share feedback</button>
+        <button onClick={() => navigateTo("privacy")}><ShieldCheck /> Privacy policy</button>
+      </div>
 
       {authInfo.authenticated && <section className="data-rights" aria-label="Your data controls">
         <div>
@@ -1418,6 +1590,19 @@ export default function App() {
           <input type="email" value={emailAddress} onChange={(event) => setEmailAddress(event.target.value)} placeholder="you@example.com" disabled={emailSubmitting} required />
           <button className="primary-action" disabled={emailSubmitting}>{emailSubmitting ? "Sending verification..." : "Send verification"}</button>
         </form>
+      </section>}
+
+      {authInfo.authenticated && <section className="data-rights private-vault-settings" aria-label="Private recording vault">
+        <div>
+          <p className="eyebrow">Private recording vault</p>
+          <h3>{vaultKeyRef.current ? "Vault unlocked" : "Unlock your recordings"}</h3>
+          <p>Your passphrase unlocks recordings in this browser session. FemmeVoice never receives it when opening your clips.</p>
+        </div>
+        {!vaultKeyRef.current && <form className="email-form" onSubmit={unlockPrivateVault}>
+          <input type="password" autoComplete="current-password" value={vaultPassphrase} onChange={(event) => setVaultPassphrase(event.target.value)} placeholder="Your FemmeVoice passphrase" required />
+          <button className="primary-action">Unlock vault</button>
+        </form>}
+        {vaultStatus && <p className="privacy-status">{vaultStatus}</p>}
       </section>}
 
       <section className="account-settings-grid" aria-label="All account settings">
@@ -1453,7 +1638,7 @@ export default function App() {
         <article>
           <p className="eyebrow">Privacy summary</p>
           <h3>What FemmeVoice remembers</h3>
-          <dl><div><dt>Audio</dt><dd>Never uploaded</dd></div><div><dt>Stored</dt><dd>Account, progress, preferences</dd></div><div><dt>Retention</dt><dd>Until you delete it</dd></div></dl>
+          <dl><div><dt>Audio</dt><dd>Only when you choose to save it</dd></div><div><dt>Stored</dt><dd>Account, progress, preferences</dd></div><div><dt>Retention</dt><dd>Until you delete it</dd></div></dl>
         </article>
       </section>
 
@@ -1465,10 +1650,10 @@ export default function App() {
         <div className="privacy-grid">
           <article><h3>Controller & contact</h3><p>Emilia Vuorenmaa is the controller for FemmeVoice. Contact: <a href="mailto:emilia@luova.club">emilia@luova.club</a>.</p></article>
           <article><h3>What we collect</h3><p>Username, salted passphrase hash, optional verified recovery email, device identifier, practice progress, preferences, and limited security/session data.</p></article>
-          <article><h3>Microphone & audio</h3><p>Pitch analysis happens in your browser. FemmeVoice does not upload or store raw microphone audio, voiceprints, or recordings.</p></article>
+          <article><h3>Microphone & audio</h3><p>Pitch analysis happens in your browser. FemmeVoice does not upload audio by default. When you explicitly save a private recording, it is encrypted in your browser before upload; our server stores only the encrypted file and cannot play it.</p></article>
           <article><h3>Why we use it</h3><p>To provide the account, sync progress, protect the service, and send an email verification when you explicitly request one. We do not use ads, sell data, or profile users.</p></article>
           <article><h3>Legal basis & retention</h3><p>We process account and progress data to provide the service you ask for. Account data remains until you delete it; security logs are retained only as long as necessary for security and operations.</p></article>
-          <article><h3>Your choices</h3><p>From Account, you can export or permanently delete your FemmeVoice data. You can also ask for access, correction, restriction, portability, or object to processing through the contact above.</p></article>
+          <article><h3>Your choices</h3><p>You decide whether to save each recording or discard it. From Account, you can export or permanently delete your FemmeVoice data. Private recordings can be deleted individually or with your account.</p></article>
           <article><h3>Who receives data</h3><p>Only infrastructure providers needed to host FemmeVoice and store its database process data for us. We do not disclose it for marketing.</p></article>
           <article><h3>Security</h3><p>We use HTTPS, secure session cookies, CSRF protection, password hashing, access controls, and data minimisation. No security measure is absolute; report a concern through the security policy in the public repository.</p></article>
         </div>
@@ -1605,6 +1790,11 @@ function buildDailyComparison(days, todaySession) {
 function formatSessionTime(seconds) {
   const minutes = Math.floor(seconds / 60);
   return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function formatStorage(bytes) {
+  if (bytes < 1024 * 1024) return `${Math.max(0, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
 }
 
 function buildSessionPlan(tier, seconds) {

@@ -5,12 +5,14 @@ import hashlib
 import smtplib
 import urllib.parse
 import urllib.request
+import uuid
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from pathlib import Path
 
 from bson import ObjectId
-from flask import Flask, jsonify, redirect, request, send_from_directory, session
+from flask import Flask, Response, jsonify, redirect, request, send_from_directory, session
+from gridfs import GridFSBucket
 from pymongo import ASCENDING, MongoClient
 from pymongo.errors import DuplicateKeyError, PyMongoError
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -38,6 +40,7 @@ SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 MAIL_FROM = os.environ.get("MAIL_FROM", SMTP_USERNAME)
 LOGIN_WINDOW_SECONDS = 15 * 60
 LOGIN_MAX_ATTEMPTS = 8
+FREE_RECORDING_LIMIT_BYTES = 100 * 1024 * 1024
 login_attempts = {}
 
 app = Flask(__name__, static_folder=str(DIST), static_url_path="")
@@ -58,12 +61,15 @@ legacy_progress_collection = legacy_db["progress"]
 users_collection = db["users"]
 email_tokens_collection = db["email_tokens"]
 feedback_collection = db["feedback"]
+recordings_collection = db["private_recordings"]
+recordings_bucket = GridFSBucket(db, bucket_name="private_recordings")
 progress_collection.create_index([("device_id", ASCENDING)])
 progress_collection.create_index([("storage_key", ASCENDING)], unique=True)
 users_collection.create_index([("username_normalized", ASCENDING)], unique=True)
 users_collection.create_index([("email_normalized", ASCENDING)], unique=True, sparse=True)
 email_tokens_collection.create_index([("expires_at", ASCENDING)], expireAfterSeconds=0)
 feedback_collection.create_index([("created_at", ASCENDING)], expireAfterSeconds=60 * 60 * 24 * 365)
+recordings_collection.create_index([("user_id", ASCENDING), ("recording_id", ASCENDING)], unique=True)
 
 
 @app.after_request
@@ -77,7 +83,7 @@ def apply_security_headers(response):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    if request.path.startswith("/api/auth/") or request.path.startswith("/api/privacy/"):
+    if request.path.startswith("/api/auth/") or request.path.startswith("/api/privacy/") or request.path.startswith("/api/recordings"):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -371,11 +377,13 @@ def export_personal_data():
     if not user:
         return auth_error("Sign in to export your data.", 401)
     document = progress_collection.find_one({"storage_key": user["key"]}, {"_id": 0})
+    recordings = list(recordings_collection.find({"user_id": user["id"]}, {"_id": 0, "file_id": 0, "user_id": 0}))
     response = jsonify({
         "exported_at": now_iso(),
         "account": {"username": user["username"], "display_name": user["display_name"]},
         "progress": document.get("progress") if document else None,
-        "notice": "This export does not include a passphrase hash or raw microphone audio. FemmeVoice does not store raw microphone audio.",
+        "private_recordings": recordings,
+        "notice": "This export does not include a passphrase hash. Private recording files are encrypted in your browser before upload and are not included in this JSON export.",
     })
     response.headers["Content-Disposition"] = "attachment; filename=femmevoice-data-export.json"
     response.headers["Cache-Control"] = "no-store"
@@ -393,6 +401,12 @@ def delete_personal_data():
     progress_collection.delete_many({"storage_key": {"$in": [user["key"], legacy_key]}})
     legacy_progress_collection.delete_many({"storage_key": legacy_key})
     feedback_collection.delete_many({"user_id": user["id"]})
+    for recording in recordings_collection.find({"user_id": user["id"]}):
+        try:
+            recordings_bucket.delete(recording["file_id"])
+        except Exception:
+            pass
+    recordings_collection.delete_many({"user_id": user["id"]})
     users_collection.delete_one({"_id": ObjectId(user["id"])})
     session.clear()
     response = jsonify({"ok": True})
@@ -418,6 +432,94 @@ def submit_feedback():
         "user_id": user["id"] if user else None,
         "created_at": datetime.now(timezone.utc),
     })
+    return jsonify({"ok": True})
+
+
+@app.get("/api/recordings")
+def list_recordings():
+    user = user_from_request()
+    if not user:
+        return auth_error("Sign in to use private recordings.", 401)
+    recordings = list(recordings_collection.find({"user_id": user["id"]}, {"_id": 0, "file_id": 0}).sort("created_at", -1).limit(100))
+    usage = sum(recording.get("byte_size", 0) for recording in recordings)
+    return jsonify({"recordings": recordings, "usage_bytes": usage, "limit_bytes": FREE_RECORDING_LIMIT_BYTES, "plan": "Free"})
+
+
+@app.post("/api/recordings")
+def upload_recording():
+    if not csrf_required():
+        return auth_error("Your session expired. Refresh and try again.", 403)
+    user = user_from_request()
+    if not user:
+        return auth_error("Sign in to save a private recording.", 401)
+    recording_id = str(request.form.get("id", ""))
+    label = str(request.form.get("label", "")).strip()[:80]
+    mime_type = str(request.form.get("mime_type", "audio/webm"))[:80]
+    try:
+        uuid.UUID(recording_id)
+        duration_ms = max(0, min(int(request.form.get("duration_ms", "0")), 10 * 60 * 1000))
+        iv = request.form.get("iv", "")
+        if len(iv) > 180 or not label:
+            raise ValueError
+    except (ValueError, TypeError):
+        return auth_error("That recording information is invalid.")
+    encrypted_file = request.files.get("audio")
+    if not encrypted_file:
+        return auth_error("Choose a recording to save.")
+    encrypted_bytes = encrypted_file.read(12 * 1024 * 1024 + 1)
+    if not encrypted_bytes or len(encrypted_bytes) > 12 * 1024 * 1024:
+        return auth_error("Private recordings must be under 12 MB.", 413)
+    if recordings_collection.count_documents({"user_id": user["id"]}) >= 100:
+        return auth_error("Your private vault has room for 100 recordings. Delete one before saving another.", 413)
+    usage = sum(recording.get("byte_size", 0) for recording in recordings_collection.find({"user_id": user["id"]}, {"byte_size": 1}))
+    if usage + len(encrypted_bytes) > FREE_RECORDING_LIMIT_BYTES:
+        return auth_error("Your free private vault has reached its 100 MB limit. Delete a recording or choose not to save this take.", 413)
+    try:
+        file_id = recordings_bucket.upload_from_stream(recording_id, encrypted_bytes, metadata={"user_id": user["id"]})
+        document = {
+            "user_id": user["id"], "recording_id": recording_id, "file_id": file_id,
+            "label": label, "duration_ms": duration_ms, "mime_type": mime_type,
+            "iv": iv, "byte_size": len(encrypted_bytes), "created_at": now_iso(),
+        }
+        recordings_collection.insert_one(document)
+    except DuplicateKeyError:
+        return auth_error("That recording is already saved.", 409)
+    except Exception:
+        return auth_error("We could not save that private recording.", 503)
+    return jsonify({"recording": {key: value for key, value in document.items() if key not in {"_id", "file_id", "user_id"}}})
+
+
+@app.get("/api/recordings/<recording_id>")
+def download_recording(recording_id):
+    user = user_from_request()
+    if not user:
+        return auth_error("Sign in to open private recordings.", 401)
+    record = recordings_collection.find_one({"user_id": user["id"], "recording_id": recording_id})
+    if not record:
+        return auth_error("That private recording was not found.", 404)
+    try:
+        encrypted_bytes = recordings_bucket.open_download_stream(record["file_id"]).read()
+    except Exception:
+        return auth_error("That private recording is unavailable.", 404)
+    response = Response(encrypted_bytes, mimetype="application/octet-stream")
+    response.headers["X-FemmeVoice-IV"] = record["iv"]
+    response.headers["X-FemmeVoice-Mime"] = record["mime_type"]
+    return response
+
+
+@app.delete("/api/recordings/<recording_id>")
+def delete_recording(recording_id):
+    if not csrf_required():
+        return auth_error("Your session expired. Refresh and try again.", 403)
+    user = user_from_request()
+    if not user:
+        return auth_error("Sign in to delete private recordings.", 401)
+    record = recordings_collection.find_one_and_delete({"user_id": user["id"], "recording_id": recording_id})
+    if record:
+        try:
+            recordings_bucket.delete(record["file_id"])
+        except Exception:
+            pass
     return jsonify({"ok": True})
 
 

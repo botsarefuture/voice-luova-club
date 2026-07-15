@@ -14,10 +14,7 @@
 body {
   margin: 0;
   min-width: 320px;
-  background:
-    linear-gradient(115deg, rgba(33, 142, 126, 0.14), transparent 36%),
-    linear-gradient(245deg, rgba(198, 82, 120, 0.12), transparent 38%),
-    #f4f1ea;
+  background: #f7f7f4;
 }
 
 button,
@@ -697,7 +694,7 @@ svg {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #218e7e, #c65278);
+  background: #218e7e;
   transition: width 180ms ease;
 }
 
@@ -1166,6 +1163,29 @@ svg {
   background: #c65278;
   transition: width 80ms linear;
 }
+
+.account-shortcuts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.account-shortcuts button { min-height: 38px; display: inline-flex; align-items: center; gap: 7px; border-radius: 8px; padding: 0 11px; color: #425049; background: rgba(35, 38, 34, 0.06); font-weight: 720; }
+
+.practice-style-picker { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 14px; border: 1px solid rgba(33, 142, 126, 0.23); border-radius: 8px; padding: 14px 16px; background: rgba(33, 142, 126, 0.07); }
+.practice-style-picker h2, .practice-style-picker p { margin: 0; }
+.practice-style-picker h2 { font-size: 1.15rem; }
+.practice-style-picker > div:last-child { display: flex; gap: 4px; padding: 4px; border-radius: 8px; background: rgba(35, 38, 34, 0.08); }
+.practice-style-picker button { min-height: 36px; border-radius: 6px; padding: 0 12px; color: #455049; background: transparent; font-weight: 760; }
+.practice-style-picker button.selected { color: #173d37; background: #fffdf8; box-shadow: 0 1px 3px rgba(35, 38, 34, 0.13); }
+
+.private-vault { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 18px; align-items: center; margin: 16px 0; border: 1px solid rgba(198, 82, 120, 0.24); border-left: 4px solid #c65278; border-radius: 8px; padding: 16px; background: rgba(198, 82, 120, 0.06); }
+.private-vault h3, .private-vault p, .private-vault small { margin: 0; }
+.private-vault p:not(.eyebrow) { margin-top: 6px; max-width: 590px; color: #525a54; line-height: 1.38; }
+.private-vault small { display: block; margin-top: 8px; color: #7c5b65; font-weight: 700; }
+.vault-actions { display: grid; justify-items: end; gap: 7px; }
+.vault-actions > p { max-width: 260px; text-align: right; color: #17665b !important; font-size: 0.84rem; font-weight: 700; }
+.saved-recordings { grid-column: 1 / -1; display: grid; gap: 7px; border-top: 1px solid rgba(35, 38, 34, 0.11); padding-top: 12px; }
+.saved-recordings > div { display: grid; grid-template-columns: minmax(0, 1fr) auto 44px; gap: 8px; align-items: center; }
+.saved-recordings span { display: grid; gap: 2px; min-width: 0; }
+.saved-recordings strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-recordings small { margin: 0; color: #68736d; font-size: 0.8rem; font-weight: 600; }
+.saved-recordings button:not(.icon-action) { min-height: 36px; border-radius: 8px; padding: 0 11px; color: #173d37; background: rgba(33, 142, 126, 0.13); font-weight: 750; }
 
 canvas {
   display: block;
@@ -1845,7 +1865,9 @@ canvas {
 
   .today-continue,
   .account-page,
-  .daily-insight {
+  .daily-insight,
+  .private-vault,
+  .practice-style-picker {
     display: grid;
     align-items: start;
   }
@@ -1896,6 +1918,9 @@ canvas {
   .hero-actions {
     justify-content: start;
   }
+
+  .vault-actions { justify-items: start; }
+  .vault-actions > p { text-align: left; max-width: none; }
 
   .flow-step {
     justify-content: start;

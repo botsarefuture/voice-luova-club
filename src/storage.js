@@ -91,6 +91,7 @@ export function mergeTodayIntoProgress(progress, session, preferences) {
     comfortAnchorMidi: preferences.comfortAnchorMidi ?? normalized.comfortAnchorMidi,
     showExtendedRange: preferences.showExtendedRange ?? normalized.showExtendedRange,
     gentleDisplay: preferences.gentleDisplay ?? normalized.gentleDisplay,
+    practiceStyle: preferences.practiceStyle ?? normalized.practiceStyle,
     totalAttempts: days.reduce((sum, day) => sum + day.attempts, 0),
     totalPracticeDays: days.length,
   });
@@ -112,6 +113,7 @@ function defaultProgress() {
     comfortAnchorMidi: null,
     showExtendedRange: false,
     gentleDisplay: false,
+    practiceStyle: "guided",
     totalAttempts: 0,
     totalPracticeDays: 0,
   };
