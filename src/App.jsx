@@ -10,6 +10,7 @@ import {
   Coffee,
   ExternalLink,
   Gauge,
+  Github,
   HeartPulse,
   Mic,
   MessageCircle,
@@ -2065,7 +2066,10 @@ export default function App() {
       </section>
 
       <button className="account-link privacy-link" onClick={() => navigateTo("privacy")}>Read the full privacy policy</button>
-      <p className="app-version">FemmeVoice v{APP_VERSION}</p>
+      <div className="app-meta-links">
+        <a href="https://github.com/botsarefuture/FemmeVoice" target="_blank" rel="noreferrer"><Github /> FemmeVoice on GitHub <ExternalLink /></a>
+        <p className="app-version">FemmeVoice v{APP_VERSION}</p>
+      </div>
       </>}
 
       {activeView === "privacy" && <section className="privacy-page" aria-label="FemmeVoice privacy policy">
