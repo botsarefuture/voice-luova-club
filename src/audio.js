@@ -1,7 +1,11 @@
 export const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 export function frequencyToMidi(frequency) {
-  return Math.round(69 + 12 * Math.log2(frequency / 440));
+  return Math.round(frequencyToMidiExact(frequency));
+}
+
+export function frequencyToMidiExact(frequency) {
+  return 69 + 12 * Math.log2(frequency / 440);
 }
 
 export function midiToFrequency(midi) {
@@ -9,8 +13,9 @@ export function midiToFrequency(midi) {
 }
 
 export function midiToNoteName(midi) {
-  const name = NOTE_NAMES[((midi % 12) + 12) % 12];
-  const octave = Math.floor(midi / 12) - 1;
+  const roundedMidi = Math.round(midi);
+  const name = NOTE_NAMES[((roundedMidi % 12) + 12) % 12];
+  const octave = Math.floor(roundedMidi / 12) - 1;
   return `${name}${octave}`;
 }
 

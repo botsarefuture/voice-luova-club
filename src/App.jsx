@@ -33,12 +33,13 @@ import {
   formatFrequency,
   formatRange,
   frequencyToMidi,
+  frequencyToMidiExact,
   midiToFrequency,
   midiToNoteName,
   semitoneSpan,
 } from "./audio";
 import { deleteAccount, downloadPrivateRecording, exportAccountData, listPrivateRecordings, loadCloudProgress, loadMe, loadReminderSettings, loginAccount, logoutAccount, registerAccount, removePrivateRecording as deletePrivateRecording, requestEmailVerification, saveCloudProgress, saveReminderSettings, submitFeedback, uploadPrivateRecording } from "./api";
-import { buildCoachTips, scoreAttempt } from "./coach";
+import { buildCoachTips, scoreAttempt, TARGET_MATCH_TOLERANCE_CENTS } from "./coach";
 import {
   dayKey,
   getDeviceId,
@@ -344,10 +345,10 @@ export default function App() {
 
   const targetMidi = useMemo(() => {
     if (exerciseMode === "resonance-step" && dailySession.highMidi !== null) {
-      return Math.min(MAX_TRAINING_MIDI, Math.max(45, dailySession.highMidi));
+      return Math.min(MAX_TRAINING_MIDI, Math.max(45, Math.round(dailySession.highMidi)));
     }
     if (exerciseMode === "speech-floor" && dailySession.lowMidi !== null) {
-      return Math.min(MAX_TRAINING_MIDI, Math.max(45, dailySession.lowMidi + 2));
+      return Math.min(MAX_TRAINING_MIDI, Math.max(45, Math.round(dailySession.lowMidi) + 2));
     }
     return Math.min(
       MAX_TRAINING_MIDI,
@@ -356,19 +357,24 @@ export default function App() {
   }, [comfortAnchorMidi, dailySession.highMidi, dailySession.lowMidi, exerciseMode, targetIndex]);
 
   const targetFrequency = midiToFrequency(targetMidi);
+  const targetLowFrequency = targetFrequency * 2 ** (-TARGET_MATCH_TOLERANCE_CENTS / 1200);
+  const targetHighFrequency = targetFrequency * 2 ** (TARGET_MATCH_TOLERANCE_CENTS / 1200);
   const rememberedTargetMidi = Math.min(
     MAX_TRAINING_MIDI,
     (progress.comfortAnchorMidi ?? DEFAULT_COMFORT_ANCHOR)
       + (EXERCISE_STEPS[progress.lastTargetIndex] ?? EXERCISE_STEPS[0]),
   );
   const currentMidi = current.frequency ? frequencyToMidi(current.frequency) : null;
+  const currentMidiExact = current.frequency ? frequencyToMidiExact(current.frequency) : null;
   const currentCents = current.frequency ? centsOff(current.frequency, targetFrequency) : null;
   const visualRangeMaxMidi = showExtendedRange ? 77 : 61;
-  const visualRangePosition = Math.max(2, Math.min(98, ((currentMidi ?? 54) - 48) / (visualRangeMaxMidi - 48) * 100));
+  const visualRangePosition = Math.max(2, Math.min(98, ((currentMidiExact ?? 54) - 48) / (visualRangeMaxMidi - 48) * 100));
+  const targetMapPosition = Math.max(2, Math.min(98, (targetMidi - 48) / (visualRangeMaxMidi - 48) * 100));
   const visualRangeLow = Math.max(0, Math.min(100, ((dailySession.lowMidi ?? 54) - 48) / (visualRangeMaxMidi - 48) * 100));
   const visualRangeHigh = Math.max(0, Math.min(100, ((dailySession.highMidi ?? dailySession.lowMidi ?? 54) - 48) / (visualRangeMaxMidi - 48) * 100));
   const sessionStats = useMemo(() => summarizeSession(history, current, dailySession), [history, current, dailySession]);
   const progressStats = useMemo(() => summarizeProgress(progress), [progress]);
+  const hasPracticeHistory = progress.days.length > 0 || dailySession.attempts.length > 0 || dailySession.highMidi !== null;
   const dailyComparison = useMemo(
     () => buildDailyComparison(progress.days, dailySession),
     [progress.days, dailySession],
@@ -399,6 +405,7 @@ export default function App() {
     comfortAnchorMidi,
     targetMidi,
     lastScore,
+    practiceStyle,
   });
   const visibleResources = resourceFilter === "all"
     ? LEARNING_RESOURCES
@@ -742,8 +749,8 @@ export default function App() {
 
     updatePrivateRecordingActivity(analysis, sample.time);
 
-    if (analysis.frequency && analysis.clarity > 0.55) {
-      const midi = frequencyToMidi(analysis.frequency);
+    if (analysis.frequency && analysis.clarity > 0.35) {
+      const midi = frequencyToMidiExact(analysis.frequency);
       captureSustainedRangeNote(midi, sample.time);
     } else {
       rangeWindowRef.current = [];
@@ -765,12 +772,12 @@ export default function App() {
   }
 
   function captureSustainedRangeNote(midi, time) {
-    const windowStart = time - 1800;
+    const windowStart = time - 520;
     const window = [...rangeWindowRef.current, { midi, time }].filter((sample) => sample.time >= windowStart);
     rangeWindowRef.current = window;
-    if (window.length < 24 || window[window.length - 1].time - window[0].time < 1700) return;
+    if (window.length < 8 || window[window.length - 1].time - window[0].time < 420) return;
     const notes = window.map((sample) => sample.midi);
-    if (Math.max(...notes) - Math.min(...notes) > 0.45) return;
+    if (Math.max(...notes) - Math.min(...notes) > 0.9) return;
     const steadyMidi = notes.slice().sort((a, b) => a - b)[Math.floor(notes.length / 2)];
     setDailySession((session) => ({
       ...session,
@@ -862,7 +869,7 @@ export default function App() {
         step: activeStep,
         time: Date.now(),
         adaptation: acceptedPitchMatch && nextTargetIndex > targetIndex
-          ? `${result.targetNote} accepted. Moving to ${midiToNoteName(nextTargetMidi)} for the next repeat.`
+          ? `You held ${result.targetNote} comfortably enough. Moving to ${midiToNoteName(nextTargetMidi)} when you are ready.`
           : result.stableAboveTarget
           ? "You are already above this reference. Keep the target, take a breath, and give yourself time to let the next sound settle toward it."
           : stepDown ? "This note is not ready today. FemmeVoice moved back one comfortable step." : null,
@@ -1274,7 +1281,7 @@ export default function App() {
       {micError && <p className="alert">{micError}</p>}
 
       <section className="metrics-grid" aria-label="Daily voice metrics">
-        <Metric icon={<Music2 />} label="Detected now" value={gentleDisplay ? (current.frequency ? "Sound heard" : "Listening") : current.frequency ? midiToNoteName(currentMidi) : "--"} detail={gentleDisplay ? "No note labels in gentle display" : formatFrequency(current.frequency)} />
+        <Metric icon={<Music2 />} label="Detected now" value={gentleDisplay ? (current.frequency ? "Sound heard" : "Listening") : current.frequency ? formatPitchPosition(currentMidiExact) : "--"} detail={gentleDisplay ? "No note labels in gentle display" : formatFrequency(current.frequency)} />
         <Metric icon={<Gauge />} label="Comfortable matches" value={gentleDisplay ? (dailySession.comfortHighMidi === null ? "Not checked yet" : "Mapped") : formatRange(dailySession.comfortLowMidi, dailySession.comfortHighMidi)} detail={dailySession.comfortHighMidi === null ? "Match a note successfully to map this" : "Only successful, steady matches count"} />
         <Metric icon={<Activity />} label="Steadiness" value={gentleDisplay ? sessionStats.stabilityLabel : `${sessionStats.stability}%`} detail={gentleDisplay ? "A soft hold is enough" : "Pitch hold"} />
         <Metric icon={<HeartPulse />} label="Mic level" value={gentleDisplay ? (current.volume > 0.12 ? "Clear" : "Soft") : sessionStats.effortLabel} detail="Volume is not vocal effort" />
@@ -1384,9 +1391,9 @@ export default function App() {
               </select>
             </label>}
             <div className="target-chip">
-              <span>{gentleDisplay ? "Reference" : "Target"}</span>
+              <span>Reference</span>
               <strong>{gentleDisplay ? "Easy next step" : midiToNoteName(targetMidi)}</strong>
-              <small>{gentleDisplay ? "Follow the tone by ear" : `${Math.round(targetFrequency)} Hz`}</small>
+              <small>{gentleDisplay ? "Follow the tone by ear" : `${Math.round(targetFrequency)} Hz · accepts ${Math.round(targetLowFrequency)}-${Math.round(targetHighFrequency)} Hz`}</small>
             </div>
             <button
               className="icon-action"
@@ -1426,7 +1433,7 @@ export default function App() {
             {activeStep !== "cooldown" && (
               <button className="primary-action" onClick={beginAttempt} disabled={recordingAttempt}>
                 <Target />
-                {recordingAttempt ? "Listening..." : activeStep === "speech" ? "Check 3-second phrase" : activeStep === "resonance" ? "Check pitch hold" : "Try 3-second match"}
+                {recordingAttempt ? "Listening..." : activeStep === "speech" ? "Hold the phrase for 3 seconds" : activeStep === "resonance" ? "Hold near the reference" : "Hold near the reference for 3 seconds"}
               </button>
             )}
             {practiceStyle === "free" && <button className="icon-action" onClick={() => moveTarget(1)} disabled={targetIndex === EXERCISE_STEPS.length - 1} aria-label="Try the next small step" title="Try the next small step">
@@ -1453,7 +1460,7 @@ export default function App() {
             </div>
             <div className="guide-legend" aria-label="Pitch guide legend">
               <span><i className="voice-dot" /> Your live pitch</span>
-              <span><i className="target-dot" /> Gentle match zone (+/- 55 cents)</span>
+              <span><i className="target-dot" /> A comfortable hold zone: about {Math.round(targetLowFrequency)}-{Math.round(targetHighFrequency)} Hz</span>
             </div>
           </section>
 
@@ -1463,13 +1470,14 @@ export default function App() {
                 <p className="eyebrow">Live pitch map</p>
                 <h3>See your voice and the next note together.</h3>
               </div>
-              <span>{currentMidi === null ? "Waiting for sound" : `You: ${gentleDisplay ? "sound heard" : midiToNoteName(currentMidi)}`}</span>
+              <span>{currentMidiExact === null ? "Waiting for sound" : `You: ${gentleDisplay ? "sound heard" : formatPitchPosition(currentMidiExact)}`}</span>
             </div>
-            <div className="range-live-track" style={{ "--range-position": `${visualRangePosition}%`, "--range-low": `${Math.min(visualRangeLow, visualRangeHigh)}%`, "--range-width": `${Math.max(1.2, Math.abs(visualRangeHigh - visualRangeLow))}%` }} aria-label={currentMidi === null ? "Waiting for a steady voice sound" : `Live pitch: ${gentleDisplay ? "detected" : midiToNoteName(currentMidi)}`}>
+            <div className="range-live-track" style={{ "--range-position": `${visualRangePosition}%`, "--target-position": `${targetMapPosition}%`, "--range-low": `${Math.min(visualRangeLow, visualRangeHigh)}%`, "--range-width": `${Math.max(1.2, Math.abs(visualRangeHigh - visualRangeLow))}%` }} aria-label={currentMidi === null ? "Waiting for a steady voice sound" : `Live pitch: ${gentleDisplay ? "detected" : midiToNoteName(currentMidi)}`}>
               <i className="range-track-blue" />
               <i className="range-track-gray" />
               <i className="range-track-pink" />
               {(dailySession.lowMidi !== null || dailySession.highMidi !== null) && <i className="range-today-window" />}
+              <i className="range-target-marker" aria-label={`Reference ${midiToNoteName(targetMidi)}`} />
               <span className={currentMidi === null ? "range-live-dot waiting" : "range-live-dot"} />
             </div>
             <div className="range-map-legend">
@@ -1478,7 +1486,7 @@ export default function App() {
               <span className="range-band pink"><b>{gentleDisplay ? "Lighter" : "F#3 - C#4"}</b> Light exploration</span>
               {showExtendedRange && <span className="range-band violet"><b>{gentleDisplay ? "Extended" : "D4 - F5"}</b> Optional exploration</span>}
             </div>
-            <p>Your dot is your live pitch. The pale window is the steady area FemmeVoice has heard today. Your current target is {gentleDisplay ? "the next gentle reference" : midiToNoteName(targetMidi)}.</p>
+            <p>Your dot is your live pitch. The teal line is the reference, {gentleDisplay ? "the next gentle reference" : midiToNoteName(targetMidi)}. The pale window is the steady area FemmeVoice has heard today.</p>
           </section>}
 
           {activeStep === "warmup" ? (
@@ -1504,7 +1512,7 @@ export default function App() {
                   </button>
                 ))}
                 <button className="next-hum" onClick={nextHumDrill}>Next hum</button>
-                <button className="next-stage" onClick={advancePracticeStep}>Go to pitch <ChevronRight /></button>
+                {practiceStyle === "free" && <button className="next-stage" onClick={advancePracticeStep}>Go to pitch <ChevronRight /></button>}
               </div>
             </div>
           ) : (
@@ -1517,9 +1525,9 @@ export default function App() {
                 <span>{practiceStyle === "guided" && GUIDED_MATCH_GOALS[activeStep] ? `Round ${Math.min((dailySession.guidedStageMatches?.[activeStep] ?? 0) + 1, GUIDED_MATCH_GOALS[activeStep])} of ${GUIDED_MATCH_GOALS[activeStep]}` : activeStageExercise.duration}</span>
               </div>
               <p>{activePractice.prompt}</p>
-              <button className="next-stage" onClick={advancePracticeStep}>
+              {(practiceStyle === "free" || activeStep === "cooldown") && <button className="next-stage" onClick={advancePracticeStep}>
                 {practiceStyle === "guided" && activeStep === "cooldown" ? "Finish today" : activeStageExercise.nextLabel} <ChevronRight />
-              </button>
+              </button>}
             </section>
           )}
 
@@ -1575,16 +1583,16 @@ export default function App() {
 
           {lastScore && (
             <div className="score-card">
-              <div className="score-ring" style={{ "--score": `${lastScore.score * 3.6}deg` }}>
-                <strong>{gentleDisplay ? "~" : lastScore.score}</strong>
-                <span>{gentleDisplay ? "check" : "/100"}</span>
+              <div className="score-ring" style={{ "--score": `${Math.min(100, (lastScore.sustainedMs ?? 0) / 30)}%` }}>
+                <strong>{lastScore.sustainedMs ? `${(lastScore.sustainedMs / 1000).toFixed(1)}` : "--"}</strong>
+                <span>sec held</span>
               </div>
               <div>
                 <h3>{lastScore.label}</h3>
                 <p>
-                  {gentleDisplay ? "A gentle check of steadiness and closeness. Keep only the part that felt easy." : lastScore.cents !== null
-                    ? `${lastScore.cents > 0 ? "+" : ""}${lastScore.cents} cents average on ${lastScore.targetNote}.`
-                    : "Try a longer, steadier sound so the coach has enough data."}
+                  {lastScore.cents !== null
+                    ? `The goal is an easy, steady hold near ${lastScore.targetNote}, not perfect pitch. Keep only what felt sustainable.`
+                    : "Try a longer, steadier sound so FemmeVoice has enough to work with."}
                 </p>
                 {lastScore.adaptation && <p className="score-adaptation">{lastScore.adaptation}</p>}
               </div>
@@ -1661,26 +1669,23 @@ export default function App() {
           <p>{dailyComparison.message}</p>
         </div>
         <div className="daily-insight-stats">
-          <div><span>Highest easy note</span><strong>{dailyComparison.highNote}</strong><small>{dailyComparison.highDetail}</small></div>
-          <div><span>Comfort range</span><strong>{dailyComparison.range}</strong><small>{dailyComparison.rangeDetail}</small></div>
+          <div><span>Highest explored pitch</span><strong>{dailyComparison.highNote}</strong><small>{dailyComparison.highDetail}</small></div>
+          <div><span>Verified match area</span><strong>{dailyComparison.range}</strong><small>{dailyComparison.rangeDetail}</small></div>
         </div>
       </section>
       <section className="progress-dashboard" aria-label="Progress over time">
         <div className="progress-summary">
           <p className="eyebrow">Progress memory</p>
-          <h2>{gentleDisplay ? `Your last saved practice step was ${MODE_LABELS[progress.lastMode]}.` : `Last time you reached ${midiToNoteName(rememberedTargetMidi)} in ${MODE_LABELS[progress.lastMode]}.`}</h2>
-          <p>
-            Reliable match area: {formatReliableRange(progressStats.reliableLowMidi, progressStats.reliableHighMidi)}.
-            {progress.bestScore !== null ? ` Best scored repeat: ${progress.bestScore}/100 on ${progress.bestScoreNote}.` : "Score a repeat to begin your history."}
-          </p>
-          <div className="measurement-explainer"><CheckCircle2 /><span>Verified notes need a clear, steady hold. A quick pitch blip cannot change this record.</span></div>
+          <h2>{hasPracticeHistory ? gentleDisplay ? `Your last saved practice step was ${MODE_LABELS[progress.lastMode]}.` : `Last time you practised near ${midiToNoteName(rememberedTargetMidi)} in ${MODE_LABELS[progress.lastMode]}.` : "Your first practice is waiting for you."}</h2>
+          <p>{hasPracticeHistory ? `Reliable hold area: ${formatReliableRange(progressStats.reliableLowMidi, progressStats.reliableHighMidi)}. This grows from comfortable sustained checks, not from hitting a perfect number.` : "Make one easy sound in Practice and FemmeVoice will begin a dated record of what you explored and held."}</p>
+          <div className="measurement-explainer"><CheckCircle2 /><span>Explored pitch records a short steady sound. Verified holds need a longer comfortable check before FemmeVoice offers the next reference.</span></div>
           <span className={syncStatus === "synced" ? "sync-pill synced" : "sync-pill"}>
             {syncStatus === "synced" ? authInfo.authenticated ? "Account progress synced" : "Anonymous cloud synced" : syncStatus === "syncing" ? "Syncing progress" : "Saved on this device"}
           </span>
         </div>
         <div className="progress-stats">
           <ProgressStat icon={<Trophy />} label="Practice days" value={progress.totalPracticeDays} detail={`${progressStats.streak} day streak`} />
-          <ProgressStat icon={<Target />} label="Scored repeats" value={progress.totalAttempts} detail={`${progressStats.averageScore}% recent avg`} />
+          <ProgressStat icon={<Target />} label="Practice checks" value={progress.totalAttempts} detail="Each one is a chance to find an easier hold" />
           <ProgressStat icon={<Gauge />} label="Reliable match area" value={formatReliableRange(progressStats.reliableLowMidi, progressStats.reliableHighMidi)} detail={progressStats.bestSpan ? `${progressStats.bestSpan} semitones across verified checks` : "Complete a sustained match to map this"} />
         </div>
         <div className="history-bars" aria-label="Recent practice history">
@@ -1688,8 +1693,8 @@ export default function App() {
         </div>
       </section>
       <section className="range-history" aria-label="Dated voice range history">
-        <div><p className="eyebrow">Your range over time</p><h2>A dated record of verified practice matches.</h2><p>A note is saved here only after a clear, sustained match check. It is a learning record, not a target.</p></div>
-        {progress.days.length ? <ol>{progress.days.map((day) => <li key={day.date}><time dateTime={day.date}>{formatHistoryDate(day.date)}</time><span>{day.comfortHighMidi === null ? "No verified match saved" : `Highest verified match: ${midiToNoteName(day.comfortHighMidi)}`}</span><small>{day.comfortLowMidi === null ? "" : `${formatReliableRange(day.comfortLowMidi, day.comfortHighMidi)}${day.comfort ? ` · Felt ${day.comfort}` : ""}`}</small></li>)}</ol> : <p className="muted">Your dated match history begins after your first sustained practice match.</p>}
+        <div><p className="eyebrow">Your range over time</p><h2>A dated record of what you explored and matched.</h2><p>Explored pitch is a short, steady sound. Verified matches are the longer target checks FemmeVoice uses to advance your lesson.</p></div>
+        {progress.days.length ? <ol>{progress.days.map((day) => <li key={day.date}><time dateTime={day.date}>{formatHistoryDate(day.date)}</time><span>{day.highMidi === null ? "No explored pitch saved" : `Explored: ${formatReliableRange(day.lowMidi, day.highMidi)}`}</span><small>{day.comfortHighMidi === null ? "No verified match yet" : `Verified: ${formatReliableRange(day.comfortLowMidi, day.comfortHighMidi)}${day.comfort ? ` · Felt ${day.comfort}` : ""}`}</small></li>)}</ol> : <p className="muted">Your dated pitch history begins after your first steady sound.</p>}
       </section>
       <section className="private-vault progress-vault" aria-label="Private recordings">
         <div>
@@ -1707,7 +1712,7 @@ export default function App() {
         </div>
         {savedRecordings.length > 0 ? <div className="saved-recordings">
           {savedRecordings.map((recording) => <div key={recording.recording_id || recording.id}><span><strong>{recording.label}</strong><small>{Math.max(1, Math.round(recording.duration_ms / 1000))} sec</small></span><button onClick={() => playPrivateRecording(recording)} disabled={playingRecording === (recording.recording_id || recording.id)}>{playingRecording === (recording.recording_id || recording.id) ? "Playing..." : "Play"}</button><button className="icon-action" onClick={() => removePrivateRecording(recording)} aria-label={`Delete ${recording.label}`}><Trash2 /></button></div>)}
-        </div> : <p className="vault-empty">Your saved practice notes will appear here.</p>}
+        </div> : <p className="vault-empty">Unlock your private vault in Settings, then record a note here. Automatic recording is a separate optional setting.</p>}
       </section>
       </>}
 
@@ -1759,11 +1764,11 @@ export default function App() {
         <div>
           <p className="eyebrow">Private account</p>
           <h2>{authInfo.authenticated ? `Signed in as ${authInfo.user?.display_name || authInfo.user?.username}` : "Keep your progress with you."}</h2>
-          <p>{authInfo.authenticated ? "Your practice history syncs privately to this account." : "Create an account to keep your training history across devices. No email address is required."}</p>
+          <p>{authInfo.authenticated ? "Your practice history syncs privately to this account." : "Create an account to keep your training history across devices. No email address is required; email reminders become available after you add and verify one."}</p>
         </div>
         <div className="account-page-actions">
           {authInfo.authenticated ? <button className="auth-action" onClick={signOut}>Sign out</button> : <><button className="primary-action" onClick={() => setAccountMode("register")}>Create account</button><button className="auth-action" onClick={() => setAccountMode("login")}>Sign in</button></>}
-          {!authInfo.authenticated && <a className="migration-link" href="/api/auth/migration">Transfer an existing training account before 1 Aug 2026</a>}
+          {!authInfo.authenticated && <a className="migration-link" href="/api/auth/migration">Already used LuovaAuth? Transfer that training account before 1 Aug 2026</a>}
         </div>
       </section>
       <div className="account-shortcuts" aria-label="Account help and privacy">
@@ -1827,7 +1832,7 @@ export default function App() {
         <article>
           <p className="eyebrow">Profile</p>
           <h3>FemmeVoice identity</h3>
-          <dl><div><dt>Username</dt><dd>{authInfo.user?.username || "Local practice"}</dd></div><div><dt>Progress</dt><dd>{syncStatus === "synced" ? "Synced" : "On this device"}</dd></div></dl>
+          <dl><div><dt>Username</dt><dd>{authInfo.user?.username || "Local practice"}</dd></div><div><dt>Progress</dt><dd>{authInfo.authenticated ? (syncStatus === "synced" ? "Account synced" : "Syncing") : "This device"}</dd></div></dl>
         </article>
         <article>
           <p className="eyebrow">Training default</p>
@@ -1869,13 +1874,14 @@ export default function App() {
             <span aria-hidden="true" />
             <strong>Automatically record voiced practice when my vault is unlocked</strong>
           </label>
+          <p>{autoRecord ? "Automatic recording is on: voiced practice will be encrypted and saved while your vault is unlocked." : "Automatic recording is off. FemmeVoice will not save audio unless you start a recording yourself."}</p>
           <button className="account-link" onClick={recalibrateComfortAnchor}>Recalibrate from my easy hum</button>
           <p>The next steady hum becomes your starting anchor. No preset pitch is required.</p>
         </article>
         <article>
           <p className="eyebrow">Privacy summary</p>
           <h3>What FemmeVoice remembers</h3>
-          <dl><div><dt>Audio</dt><dd>Only when you choose to save it</dd></div><div><dt>Stored</dt><dd>Account, progress, preferences</dd></div><div><dt>Retention</dt><dd>Until you delete it</dd></div></dl>
+          <dl><div><dt>Audio</dt><dd>Manual, or auto-record if enabled</dd></div><div><dt>Range history</dt><dd>{historyRetentionDays === 3650 ? "Up to 10 years" : `${Math.round(historyRetentionDays / 30)} months`}</dd></div><div><dt>Account & recordings</dt><dd>Until you delete them</dd></div></dl>
         </article>
       </section>
 
@@ -1972,8 +1978,10 @@ function summarizeProgress(progress) {
 function buildDailyComparison(days, todaySession) {
   const today = {
     date: dayKey(),
-    lowMidi: todaySession.comfortLowMidi,
-    highMidi: todaySession.comfortHighMidi,
+    lowMidi: todaySession.lowMidi,
+    highMidi: todaySession.highMidi,
+    comfortLowMidi: todaySession.comfortLowMidi,
+    comfortHighMidi: todaySession.comfortHighMidi,
   };
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
@@ -1987,12 +1995,12 @@ function buildDailyComparison(days, todaySession) {
     lowMidi: yesterdayRecord.comfortLowMidi,
     highMidi: yesterdayRecord.comfortHighMidi,
   } : null;
-  const range = semitoneSpan(today.lowMidi, today.highMidi);
+  const verifiedRange = semitoneSpan(today.comfortLowMidi, today.comfortHighMidi);
   const base = {
     highNote: today.highMidi === null ? "--" : midiToNoteName(today.highMidi),
-    highDetail: today.highMidi === null ? "Complete a sustained match to map it" : "Verified by a sustained match",
-    range: formatReliableRange(today.lowMidi, today.highMidi),
-    rangeDetail: range ? "Successful match area" : today.highMidi === null ? "Keep it gentle" : "One verified note so far",
+    highDetail: today.highMidi === null ? "Make a short steady sound to map it" : "Captured from a short, steady sound",
+    range: formatReliableRange(today.comfortLowMidi, today.comfortHighMidi),
+    rangeDetail: verifiedRange ? "Successful match area" : today.comfortHighMidi === null ? "Complete a target match to map it" : "One verified note so far",
   };
 
   if (today.highMidi === null) {
@@ -2040,6 +2048,14 @@ function formatReliableRange(lowMidi, highMidi) {
   if (!Number.isFinite(lowMidi) || !Number.isFinite(highMidi)) return "--";
   if (lowMidi === highMidi) return midiToNoteName(highMidi);
   return formatRange(lowMidi, highMidi);
+}
+
+function formatPitchPosition(midi) {
+  if (!Number.isFinite(midi)) return "--";
+  const nearest = Math.round(midi);
+  const cents = Math.round((midi - nearest) * 100);
+  if (Math.abs(cents) < 10) return midiToNoteName(nearest);
+  return `${midiToNoteName(nearest)} ${cents > 0 ? "+" : ""}${cents}c`;
 }
 
 function formatStorage(bytes) {
@@ -2145,12 +2161,12 @@ function calculateStreak(days) {
   return streak;
 }
 
-function getTargetExplanation({ exerciseMode, targetIndex, comfortAnchorMidi, targetMidi, lastScore }) {
+function getTargetExplanation({ exerciseMode, targetIndex, comfortAnchorMidi, targetMidi, lastScore, practiceStyle }) {
   if (exerciseMode === "resonance-step") {
     return {
       title: `A steady reference at ${midiToNoteName(targetMidi)}`,
       text: "This note is only an anchor so you can hear changes in brightness without changing everything at once.",
-      change: "This target follows the highest easy note you mapped today. Change it manually whenever it stops feeling easy.",
+      change: practiceStyle === "free" ? "This target follows the highest easy note you mapped today. Change it manually whenever it stops feeling easy." : "This target follows the highest easy note you mapped today. Keep it only while it feels easy.",
     };
   }
   if (exerciseMode === "speech-floor") {
@@ -2165,25 +2181,25 @@ function getTargetExplanation({ exerciseMode, targetIndex, comfortAnchorMidi, ta
     return {
       title: `One small step above ${base}`,
       text: "You made a close, steady match, so the ladder offered the next small interval. It is an invitation, not a requirement.",
-      change: "The target changes only after a close, easy 3-second match, or when you press the arrow buttons. Go back any time.",
+      change: practiceStyle === "free" ? "The reference changes after a comfortable hold, or when you press the arrow buttons. Go back any time." : "The reference changes after a comfortable hold. It is always okay to pause or return to a gentler sound.",
     };
   }
   return {
     title: `Starting from ${base}`,
     text: "The app waits for an easy hum, then begins just a little above it. It is training control and comfort before range.",
     change: targetIndex === 0
-      ? "Give the mic a few seconds of a clear, easy hum. A close, steady match unlocks one small step upward."
-      : "The target changes only after a close, easy 3-second match, or when you press the arrow buttons. Go back any time.",
+      ? "Give the mic a few seconds of a clear, easy hum. A comfortable hold offers one small step upward."
+      : practiceStyle === "free" ? "The reference changes after a comfortable hold, or when you press the arrow buttons. Go back any time." : "The reference changes after a comfortable hold. It is always okay to pause or return to a gentler sound.",
   };
 }
 
 function getBeginnerInstruction({ activeStep, listening, current, currentCents, recordingAttempt, lastScore }) {
   if (!listening) {
     return {
-      title: "Click Start mic, then make a tiny comfortable sound.",
+      title: "Start with one tiny, comfortable sound.",
       text: "You do not need to know your range yet. The app will detect notes as you hum and will keep today’s comfortable range for you.",
-      action: "First move: press Start mic.",
-      why: "Localhost will ask for microphone permission. Your audio stays in the browser.",
+      action: "First move: press Hold near the reference for 3 seconds.",
+      why: "Your browser will ask for microphone permission. Your audio stays in the browser.",
     };
   }
   if (!current.frequency) {

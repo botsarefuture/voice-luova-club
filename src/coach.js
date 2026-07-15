@@ -1,5 +1,7 @@
 import { centsOff, frequencyToMidi, midiToNoteName } from "./audio";
 
+export const TARGET_MATCH_TOLERANCE_CENTS = 50;
+
 export function buildCoachTips({ history, targetFrequency, currentFrequency, dailySession }) {
   const voiced = history.filter((sample) => sample.frequency && sample.clarity > 0.35);
   const recent = voiced.slice(-40);
@@ -74,14 +76,14 @@ export function scoreAttempt({ targetFrequency, samples }) {
   // A beginner needs room to learn the motion. This rewards a relaxed,
   // reasonably steady repeat instead of demanding near-perfect cents.
   const accuracy = Math.max(0, 100 - Math.abs(mean) * 0.8 - spread * 0.65);
-  const stable = spread <= 45;
-  const stableAboveTarget = stable && mean > 55;
-  const stableBelowTarget = stable && mean < -55;
+  const stable = spread <= 55;
+  const stableAboveTarget = stable && mean > TARGET_MATCH_TOLERANCE_CENTS;
+  const stableBelowTarget = stable && mean < -TARGET_MATCH_TOLERANCE_CENTS;
+  const withinTargetZone = Math.abs(mean) <= TARGET_MATCH_TOLERANCE_CENTS;
 
   let label = "Good data, try one small adjustment";
   if (longestRunMs < 1800) label = "Keep the tone going a little longer";
-  else if (accuracy >= 82) label = "Lovely, repeatable match";
-  else if (accuracy >= 64) label = "Close enough to build on";
+  else if (withinTargetZone) label = "Comfortable hold zone";
   else if (Math.abs(mean) > 65) label = mean > 0 ? "Let the pitch settle" : "Lift with a brighter vowel";
 
   return {
@@ -91,7 +93,7 @@ export function scoreAttempt({ targetFrequency, samples }) {
     spread: Math.round(spread),
     stableAboveTarget,
     stableBelowTarget,
-    matched: accuracy >= 64 && longestRunMs >= 1800,
+    matched: withinTargetZone && stable && longestRunMs >= 1800,
     sustainedMs: longestRunMs,
     targetNote: midiToNoteName(frequencyToMidi(targetFrequency)),
   };
