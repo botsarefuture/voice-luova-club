@@ -59,7 +59,7 @@ export function buildCoachTips({ history, targetFrequency, currentFrequency, dai
   return tips.slice(0, 3);
 }
 
-export function scoreAttempt({ targetFrequency, samples }) {
+export function scoreAttempt({ targetFrequency, samples, allowContour = false }) {
   const voiced = samples.filter((sample) => sample.frequency && sample.clarity > 0.55);
   if (voiced.length < 8) return { score: 0, label: "Need a longer tone", cents: null };
 
@@ -71,18 +71,20 @@ export function scoreAttempt({ targetFrequency, samples }) {
   }
 
   const cents = voiced.map((sample) => centsOff(sample.frequency, targetFrequency));
+  const pitchTravelCents = Math.round(Math.max(...cents) - Math.min(...cents));
   const mean = cents.reduce((sum, value) => sum + value, 0) / cents.length;
   const spread = Math.sqrt(cents.reduce((sum, value) => sum + (value - mean) ** 2, 0) / cents.length);
   // A beginner needs room to learn the motion. This rewards a relaxed,
   // reasonably steady repeat instead of demanding near-perfect cents.
   const accuracy = Math.max(0, 100 - Math.abs(mean) * 0.8 - spread * 0.65);
-  const stable = spread <= 55;
+  const stable = allowContour ? spread <= 220 : spread <= 55;
   const stableAboveTarget = stable && mean > TARGET_MATCH_TOLERANCE_CENTS;
   const stableBelowTarget = stable && mean < -TARGET_MATCH_TOLERANCE_CENTS;
   const withinTargetZone = Math.abs(mean) <= TARGET_MATCH_TOLERANCE_CENTS;
 
   let label = "Good data, try one small adjustment";
   if (longestRunMs < 1800) label = "Keep the tone going a little longer";
+  else if (allowContour && longestRunMs >= 1800) label = "Phrase movement captured";
   else if (withinTargetZone) label = "Comfortable hold zone";
   else if (Math.abs(mean) > 65) label = mean > 0 ? "Let the pitch settle" : "Lift with a brighter vowel";
 
@@ -93,8 +95,9 @@ export function scoreAttempt({ targetFrequency, samples }) {
     spread: Math.round(spread),
     stableAboveTarget,
     stableBelowTarget,
-    matched: withinTargetZone && stable && longestRunMs >= 1800,
+    matched: allowContour ? longestRunMs >= 1800 : withinTargetZone && stable && longestRunMs >= 1800,
     sustainedMs: longestRunMs,
+    pitchTravelCents,
     targetNote: midiToNoteName(frequencyToMidi(targetFrequency)),
   };
 }

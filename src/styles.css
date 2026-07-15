@@ -1305,6 +1305,16 @@ canvas {
   margin-top: 12px;
 }
 
+.intonation-lab { display: grid; gap: 12px; margin-top: 12px; border: 1px solid rgba(126, 83, 190, 0.3); border-radius: 8px; padding: 14px; background: rgba(126, 83, 190, 0.07); }
+.intonation-lab h3, .intonation-lab p { margin: 0; }
+.intonation-lab > div:first-child > p:last-child { margin-top: 6px; color: #525a54; line-height: 1.4; }
+.intonation-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.intonation-options button { display: grid; gap: 4px; min-height: 76px; border: 1px solid rgba(126, 83, 190, 0.28); border-radius: 8px; padding: 10px; color: #3f364c; background: rgba(255, 252, 246, 0.78); text-align: left; }
+.intonation-options button.selected { border-color: #7e53be; background: rgba(126, 83, 190, 0.16); }
+.intonation-options span { color: #61566c; font-size: 0.82rem; line-height: 1.25; }
+.intonation-cue, .intonation-readout { color: #4d3f61; line-height: 1.4; }
+.intonation-readout { font-size: 0.88rem; font-weight: 720; }
+
 .micro-drills div {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -1931,6 +1941,8 @@ canvas {
     display: grid;
     align-items: start;
   }
+
+  .intonation-options { grid-template-columns: 1fr; }
 
   .account-page-actions {
     justify-content: start;

@@ -184,8 +184,8 @@ const STAGE_EXERCISES = {
     nextLabel: "Cool down",
     cards: [
       { title: "Set up", text: "Make a short light hum near the reference, then keep that feeling for one phrase." },
-      { title: "Say it", text: 'Try "hey, I am here" with ordinary rhythm. Let the pitch move naturally.' },
-      { title: "Reset", text: "If it drops or tightens, return to the hum. One comfortable phrase is a real win." },
+      { title: "Let it move", text: "Speech is not a held note. Let the phrase rise, fall, or land naturally for its meaning." },
+      { title: "Keep your style", text: "Choose what sounds like you. A wider contour is an option to explore, never a rule for femininity." },
     ],
   },
   cooldown: {
@@ -204,6 +204,12 @@ const GUIDED_MATCH_GOALS = {
   pitch: 3,
   resonance: 2,
   speech: 2,
+};
+
+const INTONATION_PATTERNS = {
+  statement: { label: "Statement", phrase: "I can make it today.", cue: "Let the important word carry a little movement, then allow the end to settle if that feels natural." },
+  question: { label: "Question", phrase: "Can I make it today?", cue: "Let the question feel genuinely curious. A gentle lift at the end is one option, not an obligation." },
+  emphasis: { label: "Emphasis", phrase: "I can make it today.", cue: "Say it three times, placing the focus on I, make, then today. Notice how the melody changes with meaning." },
 };
 
 const MODE_LABELS = {
@@ -260,6 +266,7 @@ const LEARNING_RESOURCES = [
   { category: "practice", label: "Practice advice from Trans Voice Lessons", kind: "Video", detail: "How to make practice regular, exploratory, and sustainable instead of drilling until you are exhausted.", href: "https://www.youtube.com/watch?v=fylIX28mlyY" },
   { category: "practice", label: "Kin Maynard: how to practise", kind: "Community guide", detail: "A practical discussion of routines, expectations, and making voice practice part of ordinary life.", href: "https://www.reddit.com/r/transvoice/comments/1c5lveq/how_to_voice_train/" },
   { category: "practice", label: "Ear-training livestream", kind: "Video", detail: "Practice recognising pitch and sound changes before trying to control them. Good for days when speaking practice feels like too much.", href: "https://youtu.be/rvet1PwCoGY" },
+  { category: "practice", label: "Intonation and gender perception", kind: "Research reading", detail: "A study of intonation in cis and gender-diverse speakers. Use it as context for personal exploration, not as a rulebook for how a woman must speak.", href: "https://pubmed.ncbi.nlm.nih.gov/24094799/" },
   { category: "practice", label: "Tone generator", kind: "Practice tool", detail: "Use a quiet reference tone for matching or small slides. Start close to your comfortable voice; a high number is never the goal by itself.", href: "https://www.szynalski.com/tone-generator/" },
   { category: "listening", label: "Selene Da Silva clip collection", kind: "Listening library", detail: "An organised collection of short demonstrations. Listen for one feature at a time, then copy only a tiny piece of it.", href: "https://www.reddit.com/r/transvoice/comments/ztdtll/an_organized_collection_of_selene_da_silvas_clips/" },
   { category: "listening", label: "Jana: mimicry advice", kind: "Community guide", detail: "A guide to using a reference voice as an ear-training target, not as a demand to sound exactly like someone else.", href: "https://docs.google.com/document/d/1H49fFxiLw4C7OisG1yy0-9dQIH373UX0Il1ybV8Gju8/edit" },
@@ -316,6 +323,7 @@ export default function App() {
   const [historyRetentionDays, setHistoryRetentionDays] = useState(() => loadProgress().historyRetentionDays ?? 3650);
   const [targetMisses, setTargetMisses] = useState(0);
   const [practiceStyle, setPracticeStyle] = useState(() => loadProgress().practiceStyle ?? "guided");
+  const [intonationPattern, setIntonationPattern] = useState("statement");
   const [savedRecordings, setSavedRecordings] = useState([]);
   const [vaultRecording, setVaultRecording] = useState(false);
   const [vaultStatus, setVaultStatus] = useState("");
@@ -857,7 +865,7 @@ export default function App() {
       setAttemptProgress(100);
       if (progressTimerRef.current) window.clearInterval(progressTimerRef.current);
       progressTimerRef.current = null;
-      const result = scoreAttempt({ targetFrequency, samples: attemptSamplesRef.current });
+      const result = scoreAttempt({ targetFrequency, samples: attemptSamplesRef.current, allowContour: activeStep === "speech" });
       const stepDown = result.stableBelowTarget && activeStep === "pitch" && targetMisses >= 1 && targetIndex > 0;
       const achievedMidi = frequencyToMidi(targetFrequency * 2 ** (result.cents / 1200));
       const acceptedPitchMatch = result.matched && activeStep === "pitch";
@@ -1580,6 +1588,19 @@ export default function App() {
               <PracticeCard key={card.title} number={String(index + 1)} title={card.title} text={card.text} />
             ))}
           </div>
+
+          {activeStep === "speech" && <section className="intonation-lab" aria-label="Intonation practice">
+            <div>
+              <p className="eyebrow">Intonation lab</p>
+              <h3>Let meaning move the melody.</h3>
+              <p>FemmeVoice records pitch movement in your phrase, but it does not decide whether a contour sounds feminine. Pick the pattern that supports what you want to say.</p>
+            </div>
+            <div className="intonation-options" role="group" aria-label="Choose an intonation exercise">
+              {Object.entries(INTONATION_PATTERNS).map(([id, pattern]) => <button key={id} className={intonationPattern === id ? "selected" : ""} onClick={() => setIntonationPattern(id)} aria-pressed={intonationPattern === id}><strong>{pattern.label}</strong><span>{pattern.phrase}</span></button>)}
+            </div>
+            <p className="intonation-cue"><strong>Try:</strong> &quot;{INTONATION_PATTERNS[intonationPattern].phrase}&quot; {INTONATION_PATTERNS[intonationPattern].cue}</p>
+            {lastScore?.step === "speech" && lastScore.pitchTravelCents !== null && <p className="intonation-readout">Phrase movement: about {lastScore.pitchTravelCents} cents. This is information, not a grade.</p>}
+          </section>}
 
           {lastScore && (
             <div className="score-card">
