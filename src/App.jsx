@@ -1364,14 +1364,14 @@ export default function App() {
             <button type="button" className="modal-close" onClick={() => setAccountMode(null)} aria-label="Close account dialog">x</button>
             <p className="eyebrow">FemmeVoice account</p>
             <h2 id="account-title">{accountMode === "register" ? "Save your progress privately" : "Welcome back"}</h2>
-            <p>{accountMode === "register" ? "Choose a username and a long, unique passphrase. No email address is collected." : "Sign in with your FemmeVoice username and passphrase."}</p>
+            <p>{accountMode === "register" ? "Choose a FemmeVoice username and a long, unique passphrase. You can add a recovery email after creating your account." : "Sign in with your FemmeVoice username and passphrase. Old LuovaAuth credentials need a one-time transfer first."}</p>
             <label>Username<input autoComplete="username" value={accountForm.username} onChange={(event) => setAccountForm((form) => ({ ...form, username: event.target.value }))} required /></label>
             <label>Passphrase<input type="password" autoComplete={accountMode === "register" ? "new-password" : "current-password"} value={accountForm.password} onChange={(event) => setAccountForm((form) => ({ ...form, password: event.target.value }))} required /></label>
             {accountMode === "register" && <label>Confirm passphrase<input type="password" autoComplete="new-password" value={accountForm.confirmation} onChange={(event) => setAccountForm((form) => ({ ...form, confirmation: event.target.value }))} required /></label>}
             {accountError && <p className="account-error">{accountError}</p>}
             <button className="primary-action" disabled={accountSubmitting}>{accountSubmitting ? "Working..." : accountMode === "register" ? "Create private account" : "Sign in"}</button>
             <button type="button" className="account-switch" onClick={() => { setAccountMode(accountMode === "register" ? "login" : "register"); setAccountError(""); }}>{accountMode === "register" ? "Already have an account? Sign in" : "New here? Create an account"}</button>
-            {accountMode === "register" && <a className="migration-link" href="/api/auth/migration">Transfer an existing training account before 1 Aug 2026</a>}
+            <a className="migration-link" href="/api/auth/migration">Transfer an existing Luova training account before 1 Aug 2026</a>
             <small>By continuing, you acknowledge the privacy notes on this page.</small>
           </form>
         </div>
