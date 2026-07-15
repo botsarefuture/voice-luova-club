@@ -567,7 +567,7 @@ def put_progress(device_id):
     progress = payload.get("progress")
     if not isinstance(progress, dict) or progress.get("version") != 1:
         return jsonify({"error": "invalid progress payload"}), 400
-    if len(str(progress)) > 200_000:
+    if len(str(progress)) > 1_000_000:
         return jsonify({"error": "progress payload too large"}), 413
 
     timestamp = now_iso()

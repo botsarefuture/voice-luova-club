@@ -18,6 +18,8 @@ export function loadTodaySession() {
     date: dayKey(),
     lowMidi: null,
     highMidi: null,
+    comfortLowMidi: null,
+    comfortHighMidi: null,
     attempts: [],
     minutes: 0,
     seconds: 0,
@@ -57,6 +59,7 @@ export function saveProgress(progress) {
 
 export function mergeTodayIntoProgress(progress, session, preferences) {
   const normalized = normalizeProgress(progress);
+  const historyRetentionDays = preferences.historyRetentionDays ?? normalized.historyRetentionDays;
   const bestAttempt = session.attempts.reduce((best, attempt) => (
     !best || attempt.score > best.score ? attempt : best
   ), null);
@@ -64,6 +67,8 @@ export function mergeTodayIntoProgress(progress, session, preferences) {
     date: session.date,
     lowMidi: session.lowMidi,
     highMidi: session.highMidi,
+    comfortLowMidi: session.comfortLowMidi ?? null,
+    comfortHighMidi: session.comfortHighMidi ?? null,
     attempts: session.attempts.length,
     bestScore: bestAttempt?.score ?? null,
     bestNote: bestAttempt?.targetNote ?? null,
@@ -76,7 +81,7 @@ export function mergeTodayIntoProgress(progress, session, preferences) {
   ]
     .filter((day) => day.attempts > 0 || day.lowMidi !== null || day.highMidi !== null)
     .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 365);
+    .slice(0, historyRetentionDays);
 
   return normalizeProgress({
     ...normalized,
@@ -97,6 +102,7 @@ export function mergeTodayIntoProgress(progress, session, preferences) {
     gentleDisplay: preferences.gentleDisplay ?? normalized.gentleDisplay,
     autoRecordConsent: preferences.autoRecordConsent ?? normalized.autoRecordConsent,
     trainingGoal: preferences.trainingGoal ?? normalized.trainingGoal,
+    historyRetentionDays,
     practiceStyle: preferences.practiceStyle ?? normalized.practiceStyle,
     totalAttempts: days.reduce((sum, day) => sum + day.attempts, 0),
     totalPracticeDays: days.length,
@@ -121,6 +127,7 @@ function defaultProgress() {
     gentleDisplay: false,
     autoRecordConsent: false,
     trainingGoal: "comfort",
+    historyRetentionDays: 3650,
     practiceStyle: "guided",
     totalAttempts: 0,
     totalPracticeDays: 0,
@@ -148,7 +155,7 @@ export function mergeProgressRecords(primary, secondary) {
   const days = [...daysByDate.values()]
     .filter((day) => day?.date)
     .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 365);
+    .slice(0, Math.max(first.historyRetentionDays ?? 3650, second.historyRetentionDays ?? 3650));
 
   const bestScoreSource = [first, second].sort((a, b) => (b.bestScore ?? -1) - (a.bestScore ?? -1))[0];
 
@@ -164,6 +171,7 @@ export function mergeProgressRecords(primary, secondary) {
     gentleDisplay: Boolean(first.gentleDisplay || second.gentleDisplay),
     autoRecordConsent: first.autoRecordConsent ?? second.autoRecordConsent ?? false,
     trainingGoal: first.trainingGoal ?? second.trainingGoal ?? "comfort",
+    historyRetentionDays: Math.max(first.historyRetentionDays ?? 3650, second.historyRetentionDays ?? 3650),
     totalAttempts: days.reduce((sum, day) => sum + (day.attempts ?? 0), 0),
     totalPracticeDays: days.length,
   });
@@ -177,6 +185,8 @@ function mergeDay(a, b) {
     date: a.date || b.date,
     lowMidi: minDefined(a.lowMidi, b.lowMidi),
     highMidi: maxDefined(a.highMidi, b.highMidi),
+    comfortLowMidi: minDefined(a.comfortLowMidi, b.comfortLowMidi),
+    comfortHighMidi: maxDefined(a.comfortHighMidi, b.comfortHighMidi),
     attempts: Math.max(a.attempts ?? 0, b.attempts ?? 0),
     bestScore: maxDefined(a.bestScore, b.bestScore),
     bestNote: best.bestNote ?? a.bestNote ?? b.bestNote ?? null,

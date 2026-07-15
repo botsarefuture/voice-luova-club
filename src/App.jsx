@@ -302,6 +302,7 @@ export default function App() {
   const [gentleDisplay, setGentleDisplay] = useState(() => loadProgress().gentleDisplay ?? false);
   const [autoRecord, setAutoRecord] = useState(() => loadProgress().autoRecordConsent ?? false);
   const [trainingGoal, setTrainingGoal] = useState(() => loadProgress().trainingGoal ?? "comfort");
+  const [historyRetentionDays, setHistoryRetentionDays] = useState(() => loadProgress().historyRetentionDays ?? 3650);
   const [targetMisses, setTargetMisses] = useState(0);
   const [practiceStyle, setPracticeStyle] = useState(() => loadProgress().practiceStyle ?? "guided");
   const [savedRecordings, setSavedRecordings] = useState([]);
@@ -411,6 +412,7 @@ export default function App() {
       gentleDisplay,
       autoRecordConsent: autoRecord,
       trainingGoal,
+      historyRetentionDays,
       practiceStyle,
     }));
   }, [dailySession]);
@@ -426,9 +428,10 @@ export default function App() {
       gentleDisplay,
       autoRecordConsent: autoRecord,
       trainingGoal,
+      historyRetentionDays,
       practiceStyle,
     }));
-  }, [targetIndex, activeStep, exerciseMode, practiceTier, comfortAnchorMidi, showExtendedRange, gentleDisplay, autoRecord, trainingGoal, practiceStyle]);
+  }, [targetIndex, activeStep, exerciseMode, practiceTier, comfortAnchorMidi, showExtendedRange, gentleDisplay, autoRecord, trainingGoal, historyRetentionDays, practiceStyle]);
 
   useEffect(() => {
     saveProgress(progress);
@@ -463,6 +466,7 @@ export default function App() {
           setGentleDisplay(merged.gentleDisplay ?? false);
           setAutoRecord(merged.autoRecordConsent ?? false);
           setTrainingGoal(merged.trainingGoal ?? "comfort");
+          setHistoryRetentionDays(merged.historyRetentionDays ?? 3650);
           setPracticeStyle(merged.practiceStyle ?? "guided");
         }
         setSyncStatus("synced");
@@ -822,15 +826,22 @@ export default function App() {
       progressTimerRef.current = null;
       const result = scoreAttempt({ targetFrequency, samples: attemptSamplesRef.current });
       const stepDown = !result.matched && activeStep === "pitch" && targetMisses >= 1 && targetIndex > 0;
+      const achievedMidi = frequencyToMidi(targetFrequency * 2 ** (result.cents / 1200));
       const enriched = {
         ...result,
         mode: exerciseMode,
         step: activeStep,
         time: Date.now(),
         adaptation: stepDown ? "This note is not ready today. FemmeVoice moved back one comfortable step." : null,
+        achievedMidi,
       };
       setLastScore(enriched);
-      setDailySession((session) => ({ ...session, attempts: [...session.attempts.slice(-17), enriched] }));
+      setDailySession((session) => ({
+        ...session,
+        attempts: [...session.attempts.slice(-17), enriched],
+        comfortLowMidi: result.matched ? (session.comfortLowMidi === null ? achievedMidi : Math.min(session.comfortLowMidi, achievedMidi)) : session.comfortLowMidi,
+        comfortHighMidi: result.matched ? (session.comfortHighMidi === null ? achievedMidi : Math.max(session.comfortHighMidi, achievedMidi)) : session.comfortHighMidi,
+      }));
       if (result.matched && activeStep === "pitch") {
         setTargetMisses(0);
         setTargetIndex((index) => Math.min(EXERCISE_STEPS.length - 1, index + 1));
@@ -846,7 +857,7 @@ export default function App() {
   }
 
   function resetDay() {
-    const reset = { date: dayKey(), lowMidi: null, highMidi: null, attempts: [], minutes: 0, seconds: 0, breakAcknowledged: [], voiceCheck: "unset", guidedStep: "warmup", guidedCompleted: false, reflections: [] };
+    const reset = { date: dayKey(), lowMidi: null, highMidi: null, comfortLowMidi: null, comfortHighMidi: null, attempts: [], minutes: 0, seconds: 0, breakAcknowledged: [], voiceCheck: "unset", guidedStep: "warmup", guidedCompleted: false, reflections: [] };
     setDailySession(reset);
     saveTodaySession(reset);
     setHistory([]);
@@ -1213,7 +1224,7 @@ export default function App() {
 
       <section className="metrics-grid" aria-label="Daily voice metrics">
         <Metric icon={<Music2 />} label="Detected now" value={gentleDisplay ? (current.frequency ? "Sound heard" : "Listening") : current.frequency ? midiToNoteName(currentMidi) : "--"} detail={gentleDisplay ? "No note labels in gentle display" : formatFrequency(current.frequency)} />
-        <Metric icon={<Gauge />} label="Comfort range today" value={gentleDisplay ? (dailySession.highMidi === null ? "Still mapping" : "Gently mapped") : formatRange(dailySession.lowMidi, dailySession.highMidi)} detail={gentleDisplay ? "Only sustained, easy sounds count" : `${semitoneSpan(dailySession.lowMidi, dailySession.highMidi)} sustained semitones mapped`} />
+        <Metric icon={<Gauge />} label="Comfortable matches" value={gentleDisplay ? (dailySession.comfortHighMidi === null ? "Not checked yet" : "Mapped") : formatRange(dailySession.comfortLowMidi, dailySession.comfortHighMidi)} detail={dailySession.comfortHighMidi === null ? "Match a note successfully to map this" : "Only successful, steady matches count"} />
         <Metric icon={<Activity />} label="Steadiness" value={gentleDisplay ? sessionStats.stabilityLabel : `${sessionStats.stability}%`} detail={gentleDisplay ? "A soft hold is enough" : "Pitch hold"} />
         <Metric icon={<HeartPulse />} label="Mic level" value={gentleDisplay ? (current.volume > 0.12 ? "Clear" : "Soft") : sessionStats.effortLabel} detail="Volume is not vocal effort" />
       </section>
@@ -1740,6 +1751,13 @@ export default function App() {
           <h3>What matters most right now?</h3>
           <div className="goal-options">
             {Object.entries(TRAINING_GOALS).map(([id, goal]) => <button className={trainingGoal === id ? "selected" : ""} key={id} onClick={() => setTrainingGoal(id)} aria-pressed={trainingGoal === id}><strong>{goal.label}</strong><span>{goal.detail}</span></button>)}
+          </div>
+        </article>
+        <article>
+          <p className="eyebrow">Learning history</p>
+          <h3>How long should FemmeVoice keep your dated range record?</h3>
+          <div className="goal-options">
+            {[{ value: 90, label: "3 months" }, { value: 365, label: "1 year" }, { value: 1095, label: "3 years" }, { value: 3650, label: "10 years" }].map((option) => <button className={historyRetentionDays === option.value ? "selected" : ""} key={option.value} onClick={() => setHistoryRetentionDays(option.value)} aria-pressed={historyRetentionDays === option.value}><strong>{option.label}</strong><span>{option.value === 3650 ? "Keep a long-term personal learning record." : "Older daily range entries are removed from FemmeVoice sync."}</span></button>)}
           </div>
         </article>
         <article>
