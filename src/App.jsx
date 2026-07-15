@@ -285,8 +285,8 @@ export default function App() {
   const recordingRef = useRef(false);
   const attemptSamplesRef = useRef([]);
   const toneRef = useRef(null);
-  const startTimeRef = useRef(Date.now());
-  const sessionTimerRef = useRef(null);
+  const timedPracticeMsRef = useRef(0);
+  const lastTimerFrameRef = useRef(null);
   const progressTimerRef = useRef(null);
   const cloudLoadedRef = useRef(false);
 
@@ -459,9 +459,8 @@ export default function App() {
       source.connect(analyser);
       audioRef.current = { audioContext, analyser, stream, buffer: new Float32Array(analyser.fftSize) };
       setListening(true);
-      startTimeRef.current = Date.now() - sessionSeconds * 1000;
-      updateSessionTimer();
-      sessionTimerRef.current = window.setInterval(updateSessionTimer, 1000);
+      timedPracticeMsRef.current = sessionSeconds * 1000;
+      lastTimerFrameRef.current = Date.now();
       tick();
       return true;
     } catch (error) {
@@ -473,10 +472,9 @@ export default function App() {
   function stopListening() {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     if (progressTimerRef.current) window.clearInterval(progressTimerRef.current);
-    if (sessionTimerRef.current) window.clearInterval(sessionTimerRef.current);
     rafRef.current = null;
     progressTimerRef.current = null;
-    sessionTimerRef.current = null;
+    lastTimerFrameRef.current = null;
     recordingRef.current = false;
     const audio = audioRef.current;
     if (audio) {
@@ -510,11 +508,16 @@ export default function App() {
         highMidi: session.highMidi === null ? midi : Math.max(session.highMidi, midi),
       }));
     }
+    updateSessionTimer(sample.time, Boolean(analysis.frequency && analysis.clarity > 0.35));
     rafRef.current = requestAnimationFrame(tick);
   }
 
-  function updateSessionTimer() {
-    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startTimeRef.current) / 1000));
+  function updateSessionTimer(now, isVoiced) {
+    const previousFrame = lastTimerFrameRef.current ?? now;
+    lastTimerFrameRef.current = now;
+    if (!isVoiced) return;
+    timedPracticeMsRef.current += Math.min(250, Math.max(0, now - previousFrame));
+    const elapsedSeconds = Math.floor(timedPracticeMsRef.current / 1000);
     setDailySession((session) => {
       const previousSeconds = session.seconds ?? session.minutes * 60;
       if (elapsedSeconds <= previousSeconds) return session;
