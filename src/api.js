@@ -74,3 +74,13 @@ export async function logoutAccount() {
   csrfToken = null;
   return result;
 }
+
+export async function exportAccountData() {
+  return secureRequest("/api/privacy/export");
+}
+
+export async function deleteAccount() {
+  const result = await secureRequest("/api/privacy/account", { method: "DELETE" });
+  csrfToken = null;
+  return result;
+}

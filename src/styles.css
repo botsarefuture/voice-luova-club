@@ -269,6 +269,25 @@ svg {
   margin-top: 14px;
 }
 
+.data-rights {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  margin-top: 14px;
+  border: 1px solid rgba(35, 38, 34, 0.13);
+  border-radius: 8px;
+  padding: 16px;
+  background: rgba(255, 252, 246, 0.84);
+}
+
+.data-rights h3,
+.data-rights p { margin: 0; }
+.data-rights > div:last-of-type { display: flex; flex-wrap: wrap; gap: 8px; justify-content: end; }
+.data-rights p:not(.eyebrow) { margin-top: 6px; color: #525a54; }
+.danger-action { min-height: 44px; border-radius: 8px; padding: 0 14px; color: #8f1e3a; background: rgba(198, 82, 120, 0.14); font-weight: 760; }
+.privacy-status { grid-column: 1 / -1; color: #17665b !important; font-weight: 700; }
+
 .primary-action,
 .icon-action,
 .auth-action,

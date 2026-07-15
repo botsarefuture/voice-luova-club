@@ -63,7 +63,7 @@ def apply_security_headers(response):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    if request.path.startswith("/api/auth/"):
+    if request.path.startswith("/api/auth/") or request.path.startswith("/api/privacy/"):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -285,6 +285,40 @@ def logout():
 def me():
     user = user_from_request()
     return jsonify({"authenticated": bool(user), "user": user})
+
+
+@app.get("/api/privacy/export")
+def export_personal_data():
+    user = user_from_request()
+    if not user:
+        return auth_error("Sign in to export your data.", 401)
+    document = progress_collection.find_one({"storage_key": user["key"]}, {"_id": 0})
+    response = jsonify({
+        "exported_at": now_iso(),
+        "account": {"username": user["username"], "display_name": user["display_name"]},
+        "progress": document.get("progress") if document else None,
+        "notice": "This export does not include a passphrase hash or raw microphone audio. FemmeVoice does not store raw microphone audio.",
+    })
+    response.headers["Content-Disposition"] = "attachment; filename=femmevoice-data-export.json"
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.delete("/api/privacy/account")
+def delete_personal_data():
+    if not csrf_required():
+        return auth_error("Your session expired. Refresh and try again.", 403)
+    user = user_from_request()
+    if not user:
+        return auth_error("Sign in to delete your data.", 401)
+    legacy_key = f"luovaauth:{user['username']}"
+    progress_collection.delete_many({"storage_key": {"$in": [user["key"], legacy_key]}})
+    legacy_progress_collection.delete_many({"storage_key": legacy_key})
+    users_collection.delete_one({"_id": ObjectId(user["id"])})
+    session.clear()
+    response = jsonify({"ok": True})
+    response.headers["Clear-Site-Data"] = '"cache", "storage"'
+    return response
 
 
 @app.get("/api/progress/<device_id>")

@@ -33,7 +33,7 @@ import {
   midiToNoteName,
   semitoneSpan,
 } from "./audio";
-import { loadCloudProgress, loadMe, loginAccount, logoutAccount, registerAccount, saveCloudProgress } from "./api";
+import { deleteAccount, exportAccountData, loadCloudProgress, loadMe, loginAccount, logoutAccount, registerAccount, saveCloudProgress } from "./api";
 import { buildCoachTips, scoreAttempt } from "./coach";
 import {
   dayKey,
@@ -276,6 +276,7 @@ export default function App() {
   const [accountForm, setAccountForm] = useState({ username: "", password: "", confirmation: "" });
   const [accountError, setAccountError] = useState("");
   const [accountSubmitting, setAccountSubmitting] = useState(false);
+  const [privacyStatus, setPrivacyStatus] = useState("");
   const [resourceFilter, setResourceFilter] = useState("start");
   const [showExtendedRange, setShowExtendedRange] = useState(() => loadProgress().showExtendedRange ?? false);
 
@@ -668,6 +669,34 @@ export default function App() {
       await logoutAccount();
     } finally {
       setAuthInfo({ authenticated: false, user: null });
+    }
+  }
+
+  async function downloadPersonalData() {
+    try {
+      setPrivacyStatus("");
+      const payload = await exportAccountData();
+      const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "femmevoice-data-export.json";
+      link.click();
+      URL.revokeObjectURL(url);
+      setPrivacyStatus("Your data export is ready.");
+    } catch (error) {
+      setPrivacyStatus(error.message);
+    }
+  }
+
+  async function erasePersonalData() {
+    if (!window.confirm("Delete your FemmeVoice account and synced progress permanently? This cannot be undone.")) return;
+    try {
+      setPrivacyStatus("");
+      await deleteAccount();
+      setAuthInfo({ authenticated: false, user: null });
+      setPrivacyStatus("Your FemmeVoice account and synced data were deleted.");
+    } catch (error) {
+      setPrivacyStatus(error.message);
     }
   }
 
@@ -1253,6 +1282,19 @@ export default function App() {
         </div>
       </section>
 
+      {authInfo.authenticated && <section className="data-rights" aria-label="Your data controls">
+        <div>
+          <p className="eyebrow">Your data</p>
+          <h3>Export or erase your account</h3>
+          <p>Download the account and progress we hold for you, or permanently delete your FemmeVoice account and synced progress.</p>
+        </div>
+        <div>
+          <button className="auth-action" onClick={downloadPersonalData}>Download my data</button>
+          <button className="danger-action" onClick={erasePersonalData}>Delete account and data</button>
+        </div>
+        {privacyStatus && <p className="privacy-status">{privacyStatus}</p>}
+      </section>}
+
       <section className="account-settings" aria-label="Practice preferences">
         <p className="eyebrow">Practice preferences</p>
         <h3>Range view</h3>
@@ -1273,7 +1315,7 @@ export default function App() {
           <article><h3>Progress</h3><p>When sync is enabled, we store practice progress, preferences, and a device identifier so the app can remember your training.</p></article>
           <article><h3>Boundaries</h3><p>No advertising profile, biometric voiceprint, or sale of personal data. This is not medical diagnosis or speech therapy.</p></article>
         </div>
-        <p className="privacy-note">Use a unique passphrase of at least 15 characters. Stop practice if your voice hurts, feels scratchy, or stays fatigued. Password recovery is intentionally unavailable until verified recovery can be implemented safely.</p>
+        <p className="privacy-note">We use your account and progress to provide sync, on the basis of performing the service you ask for. FemmeVoice does not use advertising, profiling, or automated decisions. Data stays until you delete it. Use a unique passphrase of at least 15 characters. Stop practice if your voice hurts, feels scratchy, or stays fatigued. Password recovery is intentionally unavailable until verified recovery can be implemented safely.</p>
       </section>
       </>}
 
