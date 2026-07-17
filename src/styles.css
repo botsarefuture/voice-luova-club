@@ -2520,6 +2520,8 @@ canvas {
 .academy-history-privacy p { margin-top: 4px; color: #525a54; line-height: 1.42; }
 .academy-history-actions { display: flex; gap: 7px; align-items: center; }
 .danger-action { color: #9d314f; }
+.academy-sync-control { display: grid; gap: 8px; align-content: center; }
+.academy-sync-control small { max-width: 48ch; color: #59645e; line-height: 1.4; }
 .academy-empty { display: grid; justify-items: start; gap: 12px; }
 .academy-empty h2, .academy-empty p { margin: 0; }
 .academy-back { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; margin-bottom: 18px; color: #17665b; font-weight: 760; }

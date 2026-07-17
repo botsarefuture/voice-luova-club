@@ -20,7 +20,15 @@ Lesson records are version-aware. When an author publishes a new lesson revision
 
 ## Privacy controls
 
-The learner can export the local JSON record or delete it from the course overview without an account. Empty history is not persisted. Milestone 4B owns any server API, synchronization setting, merge policy, retention, account export, and account deletion flow; no history is synced in 4A.
+The learner can export the local JSON record or delete it from the course overview without an account. Empty history is not persisted.
+
+## Optional account sync
+
+Milestone 4B adds an account-only, opt-in sync setting in Account & settings. Enabling it merges the local and account records, then saves the merged record to the account. Disabling it deletes the account copy after confirmation and leaves the local device record alone.
+
+The server accepts only the documented learner-history fields, applies item and payload limits, requires an authenticated session plus CSRF protection for writes, and rejects hidden quiz responses, recordings, microphone data, or unknown fields. Account export includes the synced history; account deletion removes it. The Academy history API and MongoDB collection are separate from the legacy `voice-training:progress` / `progress` contract.
+
+Merge is deterministic: independent sessions and notes are kept by id; duplicate sessions retain the highest active duration; the most recently practised same-version lesson wins while preserving completion; a newer lesson revision supersedes an earlier revision. Sync status never blocks local use.
 
 ## Contributor notes
 

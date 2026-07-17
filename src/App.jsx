@@ -42,7 +42,7 @@ import {
   midiToNoteName,
   semitoneSpan,
 } from "./audio";
-import { deleteAccount, downloadPrivateRecording, exportAccountData, listPrivateRecordings, loadAdminFeedback, loadCloudProgress, loadMe, loadReminderSettings, loginAccount, logoutAccount, registerAccount, removePrivateRecording as deletePrivateRecording, requestEmailVerification, saveCloudProgress, saveReminderSettings, submitFeedback, uploadPrivateRecording } from "./api";
+import { deleteAccount, downloadPrivateRecording, exportAccountData, listPrivateRecordings, loadAcademyHistorySyncSettings, loadAdminFeedback, loadCloudProgress, loadMe, loadReminderSettings, loadSyncedAcademyHistory, loginAccount, logoutAccount, registerAccount, removePrivateRecording as deletePrivateRecording, requestEmailVerification, saveAcademyHistorySyncSettings, saveCloudProgress, saveReminderSettings, saveSyncedAcademyHistory, submitFeedback, uploadPrivateRecording } from "./api";
 import { buildCoachTips, scoreAttempt, TARGET_MATCH_TOLERANCE_CENTS } from "./coach";
 import {
   dayKey,
@@ -57,7 +57,7 @@ import {
 import { decryptRecording, deriveRecordingKey, encryptRecording } from "./recordings";
 import AcademyView from "./academy/AcademyView";
 import { academyRoute, parseAppRoute } from "./academy/routes";
-import { addAcademyJournalEntry, clearAcademyHistory, loadAcademyHistory, recordLessonActivity, saveAcademyHistory } from "./academy/learnerHistory";
+import { addAcademyJournalEntry, clearAcademyHistory, loadAcademyHistory, mergeAcademyHistories, recordLessonActivity, saveAcademyHistory } from "./academy/learnerHistory";
 import { APP_VERSION } from "./version";
 
 const EXERCISE_STEPS = [0, 1, 2, 3, 5, 7, 8, 10, 12];
@@ -375,6 +375,8 @@ export default function App() {
   const [dailySession, setDailySession] = useState(loadTodaySession);
   const [progress, setProgress] = useState(loadProgress);
   const [academyHistory, setAcademyHistory] = useState(loadAcademyHistory);
+  const [academyHistorySyncEnabled, setAcademyHistorySyncEnabled] = useState(false);
+  const [academyHistorySyncStatus, setAcademyHistorySyncStatus] = useState("local");
   const [targetIndex, setTargetIndex] = useState(() => loadProgress().lastTargetIndex ?? 0);
   const [exerciseMode, setExerciseMode] = useState(() => loadProgress().lastMode ?? "comfort-ladder");
   const [activeStep, setActiveStep] = useState(() => loadProgress().lastStep ?? "warmup");
@@ -430,6 +432,7 @@ export default function App() {
   const lastTimerFrameRef = useRef(null);
   const progressTimerRef = useRef(null);
   const cloudLoadedRef = useRef(false);
+  const academyHistorySyncReadyRef = useRef(false);
   const mediaRecorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const recordingStartedAtRef = useRef(null);
@@ -583,6 +586,44 @@ export default function App() {
   useEffect(() => {
     saveAcademyHistory(academyHistory);
   }, [academyHistory]);
+
+  useEffect(() => {
+    let cancelled = false;
+    academyHistorySyncReadyRef.current = false;
+    if (!authInfo.authenticated) {
+      setAcademyHistorySyncEnabled(false);
+      setAcademyHistorySyncStatus("local");
+      return () => { cancelled = true; };
+    }
+    setAcademyHistorySyncStatus("loading");
+    loadAcademyHistorySyncSettings()
+      .then(async (settings) => {
+        if (!settings.enabled) return { enabled: false, history: null };
+        return loadSyncedAcademyHistory();
+      })
+      .then((result) => {
+        if (cancelled) return;
+        if (result.enabled && result.history) setAcademyHistory((current) => mergeAcademyHistories(current, result.history));
+        academyHistorySyncReadyRef.current = result.enabled === true;
+        setAcademyHistorySyncEnabled(result.enabled === true);
+        setAcademyHistorySyncStatus(result.enabled ? "synced" : "local");
+      })
+      .catch(() => {
+        if (!cancelled) setAcademyHistorySyncStatus("error");
+      });
+    return () => { cancelled = true; };
+  }, [authInfo.authenticated]);
+
+  useEffect(() => {
+    if (!authInfo.authenticated || !academyHistorySyncEnabled || !academyHistorySyncReadyRef.current) return;
+    setAcademyHistorySyncStatus("syncing");
+    const timeout = window.setTimeout(() => {
+      saveSyncedAcademyHistory(academyHistory)
+        .then(() => setAcademyHistorySyncStatus("synced"))
+        .catch(() => setAcademyHistorySyncStatus("error"));
+    }, 600);
+    return () => window.clearTimeout(timeout);
+  }, [academyHistory, academyHistorySyncEnabled, authInfo.authenticated]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1121,6 +1162,27 @@ export default function App() {
   const deleteLocalAcademyHistory = useCallback(() => {
     setAcademyHistory(clearAcademyHistory());
   }, []);
+
+  async function updateAcademyHistorySync(enabled) {
+    if (!enabled && !window.confirm("Turn off Academy history sync and delete the synced account copy? Your history on this device will stay here.")) return;
+    try {
+      setAcademyHistorySyncStatus("saving");
+      const result = await saveAcademyHistorySyncSettings(enabled);
+      if (result.enabled) {
+        const remote = await loadSyncedAcademyHistory();
+        if (remote.history) setAcademyHistory((current) => mergeAcademyHistories(current, remote.history));
+        academyHistorySyncReadyRef.current = true;
+        setAcademyHistorySyncEnabled(true);
+        setAcademyHistorySyncStatus("synced");
+      } else {
+        academyHistorySyncReadyRef.current = false;
+        setAcademyHistorySyncEnabled(false);
+        setAcademyHistorySyncStatus("local");
+      }
+    } catch (error) {
+      setAcademyHistorySyncStatus(error.message);
+    }
+  }
 
   function selectPracticeStep(stepId) {
     setActiveStep(stepId);
@@ -1965,6 +2027,7 @@ export default function App() {
         courseSlug={academyCourseSlug}
         lessonSlug={academyLessonSlug}
         history={academyHistory}
+        historySyncEnabled={academyHistorySyncEnabled}
         onLessonHistory={recordAcademyHistory}
         onAddJournal={addAcademyJournal}
         onDeleteHistory={deleteLocalAcademyHistory}
@@ -2042,6 +2105,18 @@ export default function App() {
           <button className="danger-action" onClick={erasePersonalData}>Delete account and data</button>
         </div>
         {privacyStatus && <p className="privacy-status">{privacyStatus}</p>}
+      </section>}
+
+      {authInfo.authenticated && <section className="settings-band" aria-label="Academy history sync settings">
+        <div>
+          <p className="eyebrow">Academy history</p>
+          <h3>Keep this learning record on your account</h3>
+          <p>Sync is optional. When enabled, FemmeVoice saves your completed lesson steps, active lesson time, and notes you choose to write. It never syncs quiz answers, microphone data, audio, or recordings.</p>
+        </div>
+        <div className="academy-sync-control">
+          <label className="checkbox-row"><input type="checkbox" checked={academyHistorySyncEnabled} disabled={academyHistorySyncStatus === "loading" || academyHistorySyncStatus === "saving"} onChange={(event) => updateAcademyHistorySync(event.target.checked)} /> Sync Academy history to my account</label>
+          <small>{academyHistorySyncStatus === "synced" ? "Synced privately across your signed-in devices." : academyHistorySyncStatus === "syncing" || academyHistorySyncStatus === "saving" ? "Updating your private history…" : academyHistorySyncStatus === "loading" ? "Checking your saved preference…" : academyHistorySyncStatus === "error" ? "Could not update sync right now. Your device copy is still safe." : "Saved only on this device."}</small>
+        </div>
       </section>}
 
       {authInfo.authenticated && <section className="settings-band" aria-label="Recovery email settings">

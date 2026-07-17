@@ -8,12 +8,12 @@
 
 | Item | Current state |
 | --- | --- |
-| Current milestone | Milestone 4A - Local learner history and reflection, ready for review |
-| Current version | `v0.3.15` |
-| Current working branch | `feat/academy-learner-history` |
-| Active pull request(s) | [PR #6](https://github.com/botsarefuture/FemmeVoice/pull/6) - Academy integration review fixes; [PR #7](https://github.com/botsarefuture/FemmeVoice/pull/7) - Milestone 4A local learner history. [PR #5](https://github.com/botsarefuture/FemmeVoice/pull/5) integrated the completed Academy stack into `main`. |
-| Base branch | Short stack: this branch temporarily targets PR #6 because it depends on its resume correction. Retarget it to `main` after PR #6 merges. |
-| Next planned milestone | Milestone 4B - Opt-in sync and privacy lifecycle |
+| Current milestone | Milestone 4B - Opt-in sync and privacy lifecycle, in progress |
+| Current version | `v0.3.17` |
+| Current working branch | `feat/academy-history-sync` |
+| Active pull request(s) | [PR #6](https://github.com/botsarefuture/FemmeVoice/pull/6) - Academy integration review fixes; [PR #7](https://github.com/botsarefuture/FemmeVoice/pull/7) - Milestone 4A local learner history; [PR #8](https://github.com/botsarefuture/FemmeVoice/pull/8) - Milestone 4B opt-in sync. [PR #5](https://github.com/botsarefuture/FemmeVoice/pull/5) integrated the completed Academy stack into `main`. |
+| Base branch | Short stack: this branch temporarily targets PR #7 because it depends on the local history contract. Retarget dependent PRs to `main` after the preceding stack merges. |
+| Next planned milestone | Milestone 5 - Admin Academy |
 | Overall completion estimate | About 30% of the long-term Academy vision; the core engine is complete, while history, authoring, media, curriculum, and coaching remain substantial work. |
 
 ## Vision
@@ -39,6 +39,8 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 - `v0.3.13` - Academy integration review PR readiness
 - `v0.3.14` - Academy local learner history and reflection
 - `v0.3.15` - Academy learner-history PR readiness
+- `v0.3.16` - Academy history opt-in sync and privacy lifecycle
+- `v0.3.17` - Academy history sync PR readiness
 
 Update this list whenever a versioned change is pushed so milestones, pull requests, and releases remain easy to correlate.
 
@@ -247,14 +249,20 @@ The generic engine is complete and has been validated with real, production-qual
 
 #### Milestone 4B - Opt-in Sync And Privacy Lifecycle
 
-**Status:** ⏳ Planned
+**Status:** 🚧 In Progress
 **Goal:** Add account synchronization only after the local ledger is useful and reviewable.
 **Dependencies:** Milestone 4A
 
 **Acceptance criteria**
-- [ ] Separate versioned Academy history API and collection; no change to legacy practice sync.
-- [ ] Explicit enable/disable state, deterministic merge policy, account export, and deletion.
-- [ ] Server-side payload limits, CSRF/auth checks, and privacy tests.
+- [x] Separate versioned Academy history API and collection; no change to legacy practice sync.
+- [x] Explicit enable/disable state, deterministic merge policy, account export, and deletion.
+- [x] Server-side payload limits, CSRF/auth checks, and privacy tests.
+
+**Implemented, pending review**
+- [x] Account-only sync setting; disabling deletes the synced account copy after confirmation while retaining local history.
+- [x] Separate `academy_history` collection with a one-account record, versioned payload boundary, and no-store API responses.
+- [x] Deterministic client merge for sessions, notes, and lesson revisions.
+- [x] Account export/delete integration and client/server contract tests.
 
 ### Milestone 5 - Admin Academy
 
@@ -362,3 +370,4 @@ The generic engine is complete and has been validated with real, production-qual
 - **2026-07-17:** Roadmap refinement added Active Development, release history, the Git workflow, a media pipeline milestone, and the 4A/4B privacy boundary for learner history.
 - **2026-07-17:** Post-integration review fixes address per-lesson resume persistence, renderer-specific schema validation, and corrective safety-quiz feedback before Milestone 4 resumes.
 - **2026-07-17:** Milestone 4A implemented local-only Academy learner history, optional reflections, local-day activity summaries, export, and deletion. It is intentionally stacked on PR #6 until the review fixes merge.
+- **2026-07-17:** Milestone 4B adds opt-in account sync through a separate collection and API. Sync preserves local-first use, merges explicitly bounded learner records, and deletes the account copy when disabled.

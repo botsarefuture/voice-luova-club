@@ -19,6 +19,7 @@ from pymongo import ASCENDING, MongoClient
 from pymongo.errors import DuplicateKeyError, PyMongoError
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
+from academy_history import normalize_academy_history
 from reminder_logic import VALID_REMINDER_TONES, normalize_reminder_days
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -74,6 +75,7 @@ users_collection = db["users"]
 email_tokens_collection = db["email_tokens"]
 feedback_collection = db["feedback"]
 recordings_collection = db["private_recordings"]
+academy_history_collection = db["academy_history"]
 recordings_bucket = GridFSBucket(db, bucket_name="private_recordings")
 progress_collection.create_index([("device_id", ASCENDING)])
 progress_collection.create_index([("storage_key", ASCENDING)], unique=True)
@@ -82,6 +84,7 @@ users_collection.create_index([("email_normalized", ASCENDING)], unique=True, sp
 email_tokens_collection.create_index([("expires_at", ASCENDING)], expireAfterSeconds=0)
 feedback_collection.create_index([("created_at", ASCENDING)], expireAfterSeconds=60 * 60 * 24 * 365)
 recordings_collection.create_index([("user_id", ASCENDING), ("recording_id", ASCENDING)], unique=True)
+academy_history_collection.create_index([("user_id", ASCENDING)], unique=True)
 
 
 @app.after_request
@@ -99,7 +102,7 @@ def apply_security_headers(response):
     response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
     if request.is_secure:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    if request.path.startswith("/api/auth/") or request.path.startswith("/api/privacy/") or request.path.startswith("/api/recordings") or request.path.startswith("/api/admin/"):
+    if request.path.startswith("/api/auth/") or request.path.startswith("/api/privacy/") or request.path.startswith("/api/recordings") or request.path.startswith("/api/admin/") or request.path.startswith("/api/academy/") or request.path.startswith("/api/account/academy-history"):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -469,11 +472,13 @@ def export_personal_data():
     if not user:
         return auth_error("Sign in to export your data.", 401)
     document = progress_collection.find_one({"storage_key": user["key"]}, {"_id": 0})
+    academy_history = academy_history_collection.find_one({"user_id": user["id"]}, {"_id": 0, "user_id": 0})
     recordings = list(recordings_collection.find({"user_id": user["id"]}, {"_id": 0, "file_id": 0, "user_id": 0}))
     response = jsonify({
         "exported_at": now_iso(),
         "account": {"username": user["username"], "display_name": user["display_name"]},
         "progress": document.get("progress") if document else None,
+        "academy_history": academy_history.get("history") if academy_history else None,
         "private_recordings": recordings,
         "notice": "This export does not include a passphrase hash. Private recording files are encrypted in your browser before upload and are not included in this JSON export.",
     })
@@ -503,11 +508,81 @@ def delete_personal_data():
     legacy_progress_collection.delete_many({"storage_key": legacy_key})
     feedback_collection.delete_many({"user_id": user["id"]})
     recordings_collection.delete_many({"user_id": user["id"]})
+    academy_history_collection.delete_many({"user_id": user["id"]})
     users_collection.delete_one({"_id": ObjectId(user["id"])})
     session.clear()
     response = jsonify({"ok": True})
     response.headers["Clear-Site-Data"] = '"cache", "storage"'
     return response
+
+
+@app.get("/api/account/academy-history-sync")
+def get_academy_history_sync_settings():
+    user = user_from_request()
+    if not user:
+        return auth_error("Sign in to manage Academy history sync.", 401)
+    document = users_collection.find_one({"_id": ObjectId(user["id"])}, {"academy_history_sync_enabled": 1}) or {}
+    return jsonify({"enabled": document.get("academy_history_sync_enabled") is True})
+
+
+@app.put("/api/account/academy-history-sync")
+def update_academy_history_sync_settings():
+    if not csrf_required():
+        return auth_error("Your session expired. Refresh and try again.", 403)
+    user = user_from_request()
+    if not user:
+        return auth_error("Sign in to manage Academy history sync.", 401)
+    payload = request.get_json(silent=True) or {}
+    enabled = payload.get("enabled")
+    if not isinstance(enabled, bool):
+        return auth_error("Choose whether to sync Academy history.")
+    users_collection.update_one({"_id": ObjectId(user["id"])}, {"$set": {"academy_history_sync_enabled": enabled}})
+    if not enabled:
+        academy_history_collection.delete_many({"user_id": user["id"]})
+    return jsonify({"enabled": enabled, "deleted_synced_history": not enabled})
+
+
+@app.get("/api/academy/history")
+def get_academy_history():
+    user = user_from_request()
+    if not user:
+        return auth_error("Sign in to access synced Academy history.", 401)
+    document = users_collection.find_one({"_id": ObjectId(user["id"])}, {"academy_history_sync_enabled": 1}) or {}
+    if document.get("academy_history_sync_enabled") is not True:
+        return jsonify({"enabled": False, "history": None})
+    history = academy_history_collection.find_one({"user_id": user["id"]}, {"_id": 0, "user_id": 0})
+    return jsonify({"enabled": True, "history": history.get("history") if history else None})
+
+
+@app.put("/api/academy/history")
+def put_academy_history():
+    if not csrf_required():
+        return auth_error("Your session expired. Refresh and try again.", 403)
+    user = user_from_request()
+    if not user:
+        return auth_error("Sign in to sync Academy history.", 401)
+    document = users_collection.find_one({"_id": ObjectId(user["id"])}, {"academy_history_sync_enabled": 1}) or {}
+    if document.get("academy_history_sync_enabled") is not True:
+        return auth_error("Turn on Academy history sync before saving history.", 409)
+    if request.content_length and request.content_length > 1_000_000:
+        return auth_error("Academy history is too large.", 413)
+    payload = request.get_json(silent=True) or {}
+    try:
+        history = normalize_academy_history(payload.get("history"))
+    except ValueError as error:
+        return auth_error(str(error))
+    if len(str(history)) > 1_000_000:
+        return auth_error("Academy history is too large.", 413)
+    timestamp = now_iso()
+    try:
+        academy_history_collection.update_one(
+            {"user_id": user["id"]},
+            {"$set": {"user_id": user["id"], "history": history, "updated_at": timestamp}, "$setOnInsert": {"created_at": timestamp}},
+            upsert=True,
+        )
+    except PyMongoError as exc:
+        return jsonify({"error": "database unavailable", "detail": exc.__class__.__name__}), 503
+    return jsonify({"ok": True, "updated_at": timestamp})
 
 
 @app.post("/api/feedback")

@@ -103,6 +103,37 @@ export async function saveReminderSettings(settings) {
   });
 }
 
+export async function loadAcademyHistorySyncSettings() {
+  const response = await fetch("/api/account/academy-history-sync", { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error("Could not load Academy history sync settings.");
+  return response.json();
+}
+
+export async function saveAcademyHistorySyncSettings(enabled) {
+  return secureRequest("/api/account/academy-history-sync", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+export async function loadSyncedAcademyHistory() {
+  const response = await fetch("/api/academy/history", { headers: { Accept: "application/json" } });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || "Could not load Academy history.");
+  }
+  return response.json();
+}
+
+export async function saveSyncedAcademyHistory(history) {
+  return secureRequest("/api/academy/history", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ history }),
+  });
+}
+
 export async function submitFeedback(payload) {
   return secureRequest("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
 }

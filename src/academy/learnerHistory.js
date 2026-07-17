@@ -116,6 +116,22 @@ export function addAcademyJournalEntry(history, { note, ease = null, courseSlug 
   });
 }
 
+export function mergeAcademyHistories(first, second) {
+  const primary = normalizeAcademyHistory(first);
+  const secondary = normalizeAcademyHistory(second);
+  const lessons = new Map(Object.entries(primary.lessons));
+  Object.entries(secondary.lessons).forEach(([id, lesson]) => lessons.set(id, mergeLessonRecord(lessons.get(id), lesson)));
+  const sessions = mergeById(primary.sessions, secondary.sessions, mergeSessionRecord).slice(-MAX_SESSIONS);
+  const journal = mergeById(primary.journal, secondary.journal, (left, right) => laterRecord(left, right, "createdAt")).slice(-MAX_JOURNAL_ENTRIES);
+  return normalizeAcademyHistory({
+    version: ACADEMY_HISTORY_VERSION,
+    lessons: Object.fromEntries(lessons),
+    sessions,
+    journal,
+    updatedAt: laterTimestamp(primary.updatedAt, secondary.updatedAt),
+  });
+}
+
 export function summarizeAcademyHistory(history, courseSlug, availableLessons = []) {
   const normalized = normalizeAcademyHistory(history);
   const courseLessons = Object.values(normalized.lessons).filter((lesson) => lesson.courseSlug === courseSlug);
@@ -186,6 +202,62 @@ function normalizeJournalEntry(value) {
     lessonId: typeof value.lessonId === "string" ? value.lessonId : null,
     createdAt: typeof value.createdAt === "string" ? value.createdAt : null,
   };
+}
+
+function mergeLessonRecord(left, right) {
+  if (!left) return right;
+  if (!right) return left;
+  if (left.lessonVersion !== right.lessonVersion) return left.lessonVersion > right.lessonVersion ? left : right;
+  const recent = laterRecord(left, right, "lastPracticedAt");
+  const earlierCompletedAt = earliestTimestamp(left.completedAt, right.completedAt);
+  return normalizeLessonRecord({
+    ...recent,
+    completedBlockIds: [...new Set([...left.completedBlockIds, ...right.completedBlockIds])],
+    completionPercentage: Math.max(left.completionPercentage, right.completionPercentage),
+    currentBlock: Math.max(left.currentBlock, right.currentBlock),
+    startedAt: earliestTimestamp(left.startedAt, right.startedAt),
+    completedAt: left.completed || right.completed ? earlierCompletedAt ?? recent.completedAt : null,
+    completed: left.completed || right.completed,
+  });
+}
+
+function mergeSessionRecord(left, right) {
+  if (!left) return right;
+  if (!right) return left;
+  const recent = laterRecord(left, right, "lastActiveAt");
+  return normalizeSession({
+    ...recent,
+    startedAt: earliestTimestamp(left.startedAt, right.startedAt),
+    activeSeconds: Math.max(left.activeSeconds, right.activeSeconds),
+    completed: left.completed || right.completed,
+  });
+}
+
+function mergeById(first, second, merge) {
+  const records = new Map(first.map((item) => [item.id, item]));
+  second.forEach((item) => records.set(item.id, merge(records.get(item.id), item)));
+  return Array.from(records.values()).sort((left, right) => {
+    const timestamp = String(left.createdAt ?? left.startedAt ?? left.lastActiveAt).localeCompare(String(right.createdAt ?? right.startedAt ?? right.lastActiveAt));
+    return timestamp || String(left.id).localeCompare(String(right.id));
+  });
+}
+
+function laterRecord(left, right, timestampKey) {
+  if (!left) return right;
+  if (!right) return left;
+  const comparison = String(left[timestampKey] ?? "").localeCompare(String(right[timestampKey] ?? ""));
+  if (comparison !== 0) return comparison > 0 ? left : right;
+  return JSON.stringify(left) >= JSON.stringify(right) ? left : right;
+}
+
+function laterTimestamp(left, right) {
+  return String(left ?? "").localeCompare(String(right ?? "")) >= 0 ? left : right;
+}
+
+function earliestTimestamp(left, right) {
+  if (!left) return right ?? null;
+  if (!right) return left;
+  return String(left).localeCompare(String(right)) <= 0 ? left : right;
 }
 
 function hasStoredActivity(history) {
