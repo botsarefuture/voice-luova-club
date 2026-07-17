@@ -2582,6 +2582,15 @@ canvas {
 .admin-review-form > label:not(.admin-field) { display: flex; align-items: start; gap: 8px; font-weight: 620; }
 .admin-review-form input[type="checkbox"] { width: 18px; height: 18px; margin: 1px 0 0; }
 .admin-review-form:disabled { opacity: .62; }
+.admin-revision-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.admin-revision-list li { display: grid; gap: 3px; border: 1px solid rgba(35,38,34,.14); border-radius: 6px; padding: 9px; }
+.admin-revision-list span { color: #68736d; font-size: .8rem; line-height: 1.3; }
+.admin-revision-diff { display: grid; gap: 10px; border-left: 3px solid #218e7e; background: #f2f8f4; padding: 12px; }
+.admin-revision-diff h4, .admin-revision-diff p { margin: 0; }
+.admin-revision-diff dl { display: grid; gap: 9px; margin: 0; }
+.admin-revision-diff dl > div { display: grid; gap: 3px; }
+.admin-revision-diff dt { font-weight: 760; }
+.admin-revision-diff dd { display: grid; gap: 3px; margin: 0; color: #59645e; font-size: .9rem; line-height: 1.4; }
 .admin-validation { display: flex; gap: 8px; margin: 0; color: #9d314f; line-height: 1.4; }
 .admin-validation.valid { color: #17665b; }
 .admin-blocks { border-top: 1px solid rgba(35,38,34,.14); padding-top: 14px; }

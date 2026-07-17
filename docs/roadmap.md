@@ -8,12 +8,12 @@
 
 | Item | Current state |
 | --- | --- |
-| Current milestone | Milestone 5G - Review and publishing workflow, in progress |
-| Current version | `v0.3.24` |
-| Current working branch | `feat/academy-review-workflow` |
-| Active pull request(s) | Review-workflow PR in preparation. PR #13 is integrated into `main`. |
+| Current milestone | Milestone 5H - Revision comparison and Foundations migration, in progress |
+| Current version | `v0.3.25` |
+| Current working branch | `feat/academy-revision-comparison` |
+| Active pull request(s) | Revision-comparison PR in preparation. PR #14 is integrated into `main`. |
 | Base branch | `main` is canonical. |
-| Next planned milestone | Revision comparison and full Foundations migration through Admin Academy |
+| Next planned milestone | Full Foundations migration through Admin Academy, then Milestone 5 review |
 | Overall completion estimate | About 30% of the long-term Academy vision; the core engine is complete, while history, authoring, media, curriculum, and coaching remain substantial work. |
 
 ## Vision
@@ -48,6 +48,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 - `v0.3.22` - Structured lesson authoring forms
 - `v0.3.23` - Structured course authoring and ordering forms
 - `v0.3.24` - Academy review and publishing workflow
+- `v0.3.25` - Academy revision comparison
 
 Update this list whenever a versioned change is pushed so milestones, pull requests, and releases remain easy to correlate.
 
@@ -257,7 +258,7 @@ The generic engine is complete and has been validated with real, production-qual
 
 #### Milestone 4B - Opt-in Sync And Privacy Lifecycle
 
-**Status:** 🚧 In Progress
+**Status:** ✅ Completed
 **Goal:** Add account synchronization only after the local ledger is useful and reviewable.
 **Dependencies:** Milestone 4A
 
@@ -382,8 +383,22 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 - [x] Centrally tested server-side workflow transitions rather than UI-only status handling.
 
 **Remaining**
-- [ ] Add a clear revision comparison view for a lesson's saved versions.
 - [ ] Run the full course-and-lesson workflow against migrated Foundations content.
+
+#### Milestone 5H - Revision Comparison And Foundations Migration
+
+**Status:** 🚧 In Progress
+**Goal:** Make authored changes reviewable in context, then prove the complete Admin Academy workflow with real Foundations content.
+
+**Dependencies:** Milestones 5E-5G
+
+**Delivered in this slice**
+- [x] Saved revision history, including state and last-updated context.
+- [x] Readable comparison of lesson title, objective, duration, safety note, flow ordering, evidence count, and author change note.
+
+**Remaining**
+- [ ] Use the complete draft/review/publish flow to migrate and maintain the full Foundations course.
+- [ ] Conduct the Milestone 5 practical authoring review against that real content.
 
 ### Milestone 6 - Educational Media Pipeline
 
@@ -486,3 +501,4 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 - **2026-07-17:** Milestone 5E begins the normal-form authoring path. Lesson details, research evidence, safety/accessibility notes, translation references, and every existing block type are editable through structured controls; the canonical raw document remains an advanced escape hatch only.
 - **2026-07-17:** Milestone 5F replaces the remaining course JSON route with structured metadata and accessible ordering controls. The editor uses the existing course validation contract and starts from the real Foundations path.
 - **2026-07-17:** Milestone 5G adds a guarded author-submit, reviewer-check, publisher-release workflow. Server-side transitions reject skipped review and preserve published-revision immutability.
+- **2026-07-17:** Milestone 5H adds a readable revision-comparison view rather than relying on authors to infer changes from version numbers. The remaining proof is real Foundations migration through the completed workflow.

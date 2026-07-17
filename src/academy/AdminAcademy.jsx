@@ -14,6 +14,7 @@ export default function AdminAcademy({ roles }) {
   const [courses, setCourses] = useState([]);
   const [lesson, setLesson] = useState(null);
   const [course, setCourse] = useState(null);
+  const [comparison, setComparison] = useState(null);
   const [lessonStatus, setLessonStatus] = useState("draft");
   const [review, setReview] = useState({ decision: "approved", content_checked: false, research_checked: false, accessibility_checked: false, note: "" });
   const [changeNote, setChangeNote] = useState("");
@@ -45,6 +46,7 @@ export default function AdminAcademy({ roles }) {
     setChangeNote("Imported the current Foundations lesson as an editable draft.");
     setLessonStatus("draft");
     setReview({ decision: "approved", content_checked: false, research_checked: false, accessibility_checked: false, note: "" });
+    setComparison(null);
     setPreview(false);
   }
 
@@ -55,6 +57,7 @@ export default function AdminAcademy({ roles }) {
       setChangeNote(payload.change_note ?? "");
       setLessonStatus(payload.status ?? "draft");
       setReview(payload.review ?? { decision: "approved", content_checked: false, research_checked: false, accessibility_checked: false, note: "" });
+      setComparison(null);
       setPreview(false);
     } catch (error) { setStatus(error.message); }
   }
@@ -152,6 +155,14 @@ export default function AdminAcademy({ roles }) {
     setLessonDraft(next);
   }
 
+  async function loadComparison(record) {
+    if (!record) { setComparison(null); return; }
+    try {
+      const payload = await loadAcademyAdminLesson(record.lesson_id, record.version);
+      setComparison({ record, lesson: payload.lesson, changeNote: payload.change_note ?? "" });
+    } catch (error) { setStatus(error.message); }
+  }
+
   function applyAdvancedJson() {
     try {
       const parsed = JSON.parse(advancedJson);
@@ -170,6 +181,7 @@ export default function AdminAcademy({ roles }) {
           <LessonDetails lesson={lesson} onChange={updateLesson} />
           <EvidenceEditor lesson={lesson} onChange={updateLesson} />
           <BlockEditor lesson={lesson} onChange={updateLesson} />
+          <RevisionComparison lesson={lesson} records={records} comparison={comparison} onCompare={loadComparison} />
           <PublishingWorkflow lesson={lesson} lessonStatus={lessonStatus} review={review} onReviewChange={setReview} roles={roles} onSubmit={submitForReview} onReview={completeReview} onPublish={publishRevision} />
           <details className="admin-advanced-json"><summary>Advanced structured document</summary><p>Use this only for carefully reviewed schema-level changes. Normal lesson authoring happens in the forms above.</p><textarea aria-label="Advanced lesson document" value={advancedJson} onChange={(event) => setAdvancedJson(event.target.value)} rows="16" spellCheck="false" /><button type="button" className="secondary-action" onClick={applyAdvancedJson}>Apply advanced changes</button></details>
           <label>Change note<textarea value={changeNote} onChange={(event) => setChangeNote(event.target.value)} placeholder="What changed, and why?" rows="3" maxLength="4000" /></label>
@@ -200,6 +212,25 @@ function PublishingWorkflow({ lesson, lessonStatus, review, onReviewChange, role
   const canPublish = roles.includes("publisher") && lessonStatus === "in_review" && review.decision === "approved";
   const reviewComplete = review.content_checked && review.research_checked && review.accessibility_checked;
   return <section className="admin-form-section admin-publishing-workflow" aria-labelledby="publishing-title"><div><p className="eyebrow">Review and publishing</p><h3 id="publishing-title">Protect learners with a deliberate release path.</h3><p>Current revision: <strong>v{lesson.version}</strong> <span className={`academy-content-status status-${lessonStatus}`}>{formatContentStatus(lessonStatus)}</span></p></div>{lessonStatus === "published" ? <p className="admin-published-notice">This revision is published and immutable. Duplicate it with a new version before making a material change.</p> : <><div className="admin-workflow-actions">{roles.includes("author") && <button type="button" className="secondary-action" onClick={onSubmit}><Send /> Submit for review</button>}{canPublish && <button type="button" className="primary-action" onClick={onPublish}><Stamp /> Publish revision</button>}</div>{roles.includes("reviewer") && <fieldset className="admin-review-form" disabled={!canReview}><legend>Reviewer checks</legend><p>Review is available after an author submits this revision. Each check is required so evidence, access, and teaching quality are considered together.</p><label><input type="checkbox" checked={review.content_checked} onChange={(event) => onReviewChange({ ...review, content_checked: event.target.checked })} /> Content is clear, accurate, and supportive.</label><label><input type="checkbox" checked={review.research_checked} onChange={(event) => onReviewChange({ ...review, research_checked: event.target.checked })} /> Evidence references and limitations are appropriate.</label><label><input type="checkbox" checked={review.accessibility_checked} onChange={(event) => onReviewChange({ ...review, accessibility_checked: event.target.checked })} /> Accessibility alternatives are complete and usable.</label><label>Decision<select value={review.decision} onChange={(event) => onReviewChange({ ...review, decision: event.target.value })}><option value="approved">Approve for publication</option><option value="changes_requested">Request changes</option></select></label><Field label="Review note" value={review.note ?? ""} onChange={(value) => onReviewChange({ ...review, note: value })} multiline /><button type="button" className="primary-action" onClick={onReview} disabled={!canReview || !reviewComplete}><ShieldCheck /> Save review</button></fieldset>}</>}</section>;
+}
+
+function RevisionComparison({ lesson, records, comparison, onCompare }) {
+  const revisions = records.filter((record) => record.lesson_id === lesson.id).sort((left, right) => right.version - left.version);
+  const selectedVersion = comparison?.record.version ?? "";
+  return <section className="admin-form-section admin-revision-comparison" aria-labelledby="revision-comparison-title"><div className="admin-section-heading"><div><p className="eyebrow">Revision history</p><h3 id="revision-comparison-title">Compare a saved version before you publish.</h3></div>{revisions.length > 0 && <label className="inline-select">Compare with<select value={selectedVersion} onChange={(event) => onCompare(revisions.find((record) => record.version === Number(event.target.value)))}><option value="">Choose saved version...</option>{revisions.filter((record) => record.version !== lesson.version).map((record) => <option key={record.version} value={record.version}>v{record.version} - {formatContentStatus(record.status)}</option>)}</select></label>}</div>{revisions.length === 0 ? <p className="lesson-muted">Save this draft to begin its revision history.</p> : <ol className="admin-revision-list">{revisions.map((record) => <li key={record.version}><strong>v{record.version}</strong><span>{formatContentStatus(record.status)}{record.updated_at ? ` - ${formatRevisionDate(record.updated_at)}` : ""}</span></li>)}</ol>}{comparison && <RevisionDiff current={lesson} previous={comparison.lesson} changeNote={comparison.changeNote} />}</section>;
+}
+
+function RevisionDiff({ current, previous, changeNote }) {
+  const changes = [];
+  addChange(changes, "Title", previous.title, current.title);
+  addChange(changes, "Learning objective", previous.objective, current.objective);
+  addChange(changes, "Estimated duration", previous.metadata?.estimatedMinutes, current.metadata?.estimatedMinutes);
+  addChange(changes, "Safety note", previous.safety?.note, current.safety?.note);
+  const previousBlockIds = previous.blocks.map((block) => block.id);
+  const currentBlockIds = current.blocks.map((block) => block.id);
+  if (previousBlockIds.join("|") !== currentBlockIds.join("|")) changes.push({ label: "Lesson flow", before: previousBlockIds.join(" -> ") || "No blocks", after: currentBlockIds.join(" -> ") || "No blocks" });
+  if (previous.evidence.length !== current.evidence.length) changes.push({ label: "Evidence references", before: `${previous.evidence.length} linked`, after: `${current.evidence.length} linked` });
+  return <div className="admin-revision-diff"><h4>Compared with v{previous.version}</h4>{changeNote && <p><strong>Saved change note:</strong> {changeNote}</p>}{changes.length ? <dl>{changes.map((change) => <div key={change.label}><dt>{change.label}</dt><dd><span>Before: {displayValue(change.before)}</span><span>Now: {displayValue(change.after)}</span></dd></div>)}</dl> : <p>No summary fields changed. Review individual block content before publishing.</p>}</div>;
 }
 
 function CourseEditor({ course, records, courses, onStart, onOpen, onChange, onSave, canAuthor }) {
@@ -269,6 +300,9 @@ function Field({ label, value, onChange, multiline = false, hint, required = fal
 function commaList(value) { return value.split(",").map((item) => item.trim()).filter(Boolean); }
 function numberOrZero(value) { return value === "" ? 0 : Number(value); }
 function formatContentStatus(status) { return ({ draft: "Draft", review_requested: "Review requested", in_review: "Approved for publication", published: "Published" })[status] ?? status; }
+function formatRevisionDate(value) { const date = new Date(value); return Number.isNaN(date.valueOf()) ? value : date.toLocaleDateString(); }
+function displayValue(value) { return value === undefined || value === null || value === "" ? "Not set" : String(value); }
+function addChange(changes, label, before, after) { if (before !== after) changes.push({ label, before, after }); }
 function uniqueLessons(records) {
   const staticLessons = FOUNDATIONS_LESSONS.map((lesson) => ({ id: lesson.slug, title: lesson.title }));
   const savedLessons = records.map((record) => ({ id: record.lesson_id, title: record.title }));
