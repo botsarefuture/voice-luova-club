@@ -1,12 +1,13 @@
 {
   "name": "femmevoice",
-  "version": "0.3.6",
+  "version": "0.3.8",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test test/*.test.mjs",
     "check:version": "node scripts/check-version.mjs",
     "check:version-bump": "node scripts/require-version-bump.mjs"
   },

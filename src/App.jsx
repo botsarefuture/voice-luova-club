@@ -55,6 +55,8 @@ import {
   saveTodaySession,
 } from "./storage";
 import { decryptRecording, deriveRecordingKey, encryptRecording } from "./recordings";
+import AcademyView from "./academy/AcademyView";
+import { academyRoute, parseAppRoute } from "./academy/routes";
 import { APP_VERSION } from "./version";
 
 const EXERCISE_STEPS = [0, 1, 2, 3, 5, 7, 8, 10, 12];
@@ -70,6 +72,7 @@ const APP_VIEWS = [
   { id: "today", label: "Today", icon: HeartPulse },
   { id: "practice", label: "Practice", icon: Waves },
   { id: "progress", label: "Progress", icon: Activity },
+  { id: "academy", label: "Academy", icon: BookOpen },
   { id: "learn", label: "Learn", icon: BookOpen },
   { id: "guide", label: "Guide", icon: ScrollText },
   { id: "account", label: "Settings", icon: UserRound },
@@ -77,11 +80,15 @@ const APP_VIEWS = [
   { id: "feedback", label: "Feedback", icon: MessageCircle },
   { id: "admin-feedback", label: "Feedback inbox", icon: Inbox },
 ];
-const MAIN_VIEW_IDS = new Set(["today", "practice", "progress", "learn", "guide"]);
+const MAIN_VIEW_IDS = new Set(["today", "practice", "progress", "academy", "learn", "guide"]);
 
-function initialView() {
-  const view = window.location.hash.replace("#", "");
-  return APP_VIEWS.some((item) => item.id === view) ? view : "today";
+function initialRoute() {
+  const route = parseAppRoute(window.location.hash);
+  return {
+    view: APP_VIEWS.some((item) => item.id === route.view) ? route.view : "today",
+    academyCourseSlug: route.view === "academy" ? route.academyCourseSlug : null,
+    academyLessonSlug: route.view === "academy" ? route.academyLessonSlug : null,
+  };
 }
 
 const PRACTICE_FLOW = [
@@ -356,7 +363,9 @@ const RESEARCH_GUIDE = [
 ];
 
 export default function App() {
-  const [activeView, setActiveView] = useState(initialView);
+  const [activeView, setActiveView] = useState(() => initialRoute().view);
+  const [academyCourseSlug, setAcademyCourseSlug] = useState(() => initialRoute().academyCourseSlug);
+  const [academyLessonSlug, setAcademyLessonSlug] = useState(() => initialRoute().academyLessonSlug);
   const [deviceId] = useState(getDeviceId);
   const [listening, setListening] = useState(false);
   const [micError, setMicError] = useState("");
@@ -514,7 +523,12 @@ export default function App() {
     : LEARNING_RESOURCES.filter((resource) => resource.category === resourceFilter);
 
   useEffect(() => {
-    const handleHashChange = () => setActiveView(initialView());
+    const handleHashChange = () => {
+      const route = initialRoute();
+      setActiveView(route.view);
+      setAcademyCourseSlug(route.academyCourseSlug);
+      setAcademyLessonSlug(route.academyLessonSlug);
+    };
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
@@ -1077,6 +1091,16 @@ export default function App() {
   function navigateTo(view) {
     window.location.hash = view;
     setActiveView(view);
+    setAcademyCourseSlug(null);
+    setAcademyLessonSlug(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function navigateToAcademy(courseSlug = null, lessonSlug = null) {
+    window.location.hash = academyRoute(courseSlug, lessonSlug);
+    setActiveView("academy");
+    setAcademyCourseSlug(courseSlug);
+    setAcademyLessonSlug(lessonSlug);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -1359,7 +1383,7 @@ export default function App() {
         <section className="view-intro">
           <p className="eyebrow">FemmeVoice</p>
           <h1>{APP_VIEWS.find((view) => view.id === activeView)?.label}</h1>
-          <p>{activeView === "practice" ? "One calm exercise at a time. Stop any time your voice stops feeling easy." : activeView === "progress" ? "Your practice history, range notes, and gentle next steps." : activeView === "learn" ? "Simple explanations first, then deeper resources whenever you want them." : activeView === "guide" ? "What FemmeVoice is based on, what its measurements mean, and where the evidence has limits." : activeView === "privacy" ? "A plain-language account of what FemmeVoice stores, why, and how you stay in control." : activeView === "feedback" ? "Tell us what feels useful, unclear, missing, or unsafe. Thoughtful feedback shapes FemmeVoice." : activeView === "admin-feedback" ? "Private feedback review for FemmeVoice administrators." : "Your private FemmeVoice account, preferences, and safety information."}</p>
+          <p>{activeView === "practice" ? "One calm exercise at a time. Stop any time your voice stops feeling easy." : activeView === "progress" ? "Your practice history, range notes, and gentle next steps." : activeView === "academy" ? "A private, structured place to learn one useful thing at a time." : activeView === "learn" ? "Simple explanations first, then deeper resources whenever you want them." : activeView === "guide" ? "What FemmeVoice is based on, what its measurements mean, and where the evidence has limits." : activeView === "privacy" ? "A plain-language account of what FemmeVoice stores, why, and how you stay in control." : activeView === "feedback" ? "Tell us what feels useful, unclear, missing, or unsafe. Thoughtful feedback shapes FemmeVoice." : activeView === "admin-feedback" ? "Private feedback review for FemmeVoice administrators." : "Your private FemmeVoice account, preferences, and safety information."}</p>
         </section>
       )}
 
@@ -1918,6 +1942,13 @@ export default function App() {
           ))}
         </div>
       </section>}
+
+      {activeView === "academy" && <AcademyView
+        courseSlug={academyCourseSlug}
+        lessonSlug={academyLessonSlug}
+        onOpenCourse={navigateToAcademy}
+        onBack={() => navigateToAcademy()}
+      />}
 
       {activeView === "guide" && <section className="research-guide" aria-label="FemmeVoice evidence guide">
         <div className="guide-heading">
