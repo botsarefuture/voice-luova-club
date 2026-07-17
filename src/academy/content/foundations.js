@@ -142,6 +142,7 @@ export const FOUNDATIONS_LESSONS = [
       }, ["multidimensional-voice"]),
       block("voice-pathway", "image", "Illustration", "A simple sound pathway", 2, { kind: "manual" }, {
         src: "/academy/voice-pathway.jpg",
+        assetRef: { id: "voice-pathway", version: 1, locale: "en" },
         caption: "Air moves from the lungs, through the throat and mouth, and becomes sound. This is a simplified orientation image, not a diagnostic anatomy diagram.",
       }, [], {
         alternative: "A simplified side-profile illustration shows teal lungs and an upward teal airflow path through the throat and mouth, with soft coral sound waves leaving the lips.",

@@ -118,7 +118,9 @@ def apply_security_headers(response):
     if request.is_secure:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     public_academy_paths = {"/api/academy/content", "/api/academy/media"}
-    if request.path.startswith("/api/auth/") or request.path.startswith("/api/privacy/") or request.path.startswith("/api/recordings") or request.path.startswith("/api/admin/") or (request.path.startswith("/api/academy/") and request.path not in public_academy_paths) or request.path.startswith("/api/account/academy-history"):
+    if response.mimetype == "text/html":
+        response.headers["Cache-Control"] = "no-cache"
+    elif request.path.startswith("/api/auth/") or request.path.startswith("/api/privacy/") or request.path.startswith("/api/recordings") or request.path.startswith("/api/admin/") or (request.path.startswith("/api/academy/") and request.path not in public_academy_paths) or request.path.startswith("/api/account/academy-history"):
         response.headers["Cache-Control"] = "no-store"
     return response
 

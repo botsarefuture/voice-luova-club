@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, Clock3, ShieldCheck } from "lucide-react";
 import { formatCourseDuration } from "./catalog";
-import { loadPublicAcademyContent } from "../api";
+import { loadPublicAcademyContent, loadPublicAcademyMedia } from "../api";
 import LessonPlayer from "./LessonPlayer";
 import { getFoundationsLesson } from "./content/foundations";
 import AcademyHistory from "./AcademyHistory";
@@ -14,9 +14,12 @@ export default function AcademyView({ courseSlug, lessonSlug, onOpenCourse, onBa
 
   useEffect(() => {
     let active = true;
-    loadPublicAcademyContent().then((payload) => {
-      if (active) setContent(normalizePublishedAcademyContent(payload));
-    }).catch(() => {});
+    Promise.allSettled([loadPublicAcademyContent(), loadPublicAcademyMedia()]).then(([contentResult, mediaResult]) => {
+      if (!active) return;
+      const payload = contentResult.status === "fulfilled" ? contentResult.value : null;
+      const media = mediaResult.status === "fulfilled" ? mediaResult.value : null;
+      setContent(normalizePublishedAcademyContent(payload, staticAcademyContent(), media));
+    });
     return () => { active = false; };
   }, []);
 

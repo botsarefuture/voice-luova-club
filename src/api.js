@@ -32,6 +32,12 @@ export async function loadPublicAcademyContent() {
   return response.json();
 }
 
+export async function loadPublicAcademyMedia() {
+  const response = await fetch("/api/academy/media", { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error("Published Academy media is unavailable.");
+  return response.json();
+}
+
 export async function loadCloudProgress(deviceId) {
   const response = await fetch(`/api/progress/${encodeURIComponent(deviceId)}`, {
     headers: { Accept: "application/json" },

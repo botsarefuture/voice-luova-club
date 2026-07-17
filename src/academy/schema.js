@@ -176,6 +176,7 @@ function validateBlockContent(block, errors) {
     case "audio":
     case "video":
       if (!isNonEmptyString(content.src)) error("needs a media source");
+      if (content.assetRef !== undefined && !isValidAssetRef(content.assetRef)) error("has an invalid governed media reference");
       break;
     default:
       break;
@@ -197,6 +198,10 @@ function isValidRichTextChild(child) {
 
 function isValidQuizOption(option) {
   return isPlainObject(option) && isNonEmptyString(option.id) && isNonEmptyString(option.label) && typeof option.correct === "boolean";
+}
+
+function isValidAssetRef(reference) {
+  return isPlainObject(reference) && isNonEmptyString(reference.id) && Number.isInteger(reference.version) && reference.version > 0 && isNonEmptyString(reference.locale);
 }
 
 function isSafeHref(value) {

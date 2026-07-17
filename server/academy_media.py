@@ -18,7 +18,7 @@ def validate_media_asset(asset, require_review=True, publication_ready=True):
         raise ValueError("Media asset schema version is unsupported.")
     if not _text(asset["id"], 120) or not isinstance(asset["version"], int) or asset["version"] < 1:
         raise ValueError("Media asset identity is invalid.")
-    if asset["kind"] not in MEDIA_KINDS or not _text(asset["locale"], 20) or not _safe_source(asset["source"]) or not _text(asset["title"], 300):
+    if asset["kind"] not in MEDIA_KINDS or not _text(asset["locale"], 20) or not _safe_source(asset["source"], https_allowed=False) or not _text(asset["title"], 300):
         raise ValueError("Media asset metadata is invalid.")
     if not _text(asset["mimeType"], 120) or not isinstance(asset["byteSize"], int) or not 0 <= asset["byteSize"] <= 5_000_000_000:
         raise ValueError("Media type or byte size is invalid.")
@@ -57,19 +57,19 @@ def media_review_result_status(decision):
 
 
 def build_public_media_manifest(records):
-    latest = {}
+    published = {}
     for record in records:
         asset = record.get("asset") or {}
-        identity = (asset.get("id"), asset.get("locale"))
+        identity = (asset.get("id"), asset.get("version"), asset.get("locale"))
         version = asset.get("version", 0)
-        if identity[0] and identity[1] and version > latest.get(identity, {}).get("version", 0):
-            latest[identity] = asset
+        if identity[0] and isinstance(version, int) and version > 0 and identity[2]:
+            published[identity] = asset
     assets = []
-    for asset in latest.values():
+    for asset in published.values():
         public = deepcopy(asset)
         public["review"] = {key: public.get("review", {}).get(key) is True for key in REVIEW_KEYS}
         assets.append(public)
-    assets.sort(key=lambda item: (item["id"], item["locale"]))
+    assets.sort(key=lambda item: (item["id"], item["locale"], item["version"]))
     return {"schemaVersion": MEDIA_SCHEMA_VERSION, "assets": assets}
 
 
@@ -91,7 +91,7 @@ def _validate_accessibility(kind, access, require_complete=True):
         raise ValueError("Images need alternative text.")
     if require_complete and kind in {"audio", "video"} and not _text(access.get("transcript"), 12000):
         raise ValueError("Audio and video need a transcript.")
-    if require_complete and kind == "video" and not _safe_source(access.get("captions")):
+    if require_complete and kind == "video" and not _safe_source(access.get("captions"), https_allowed=False):
         raise ValueError("Video needs a safe captions source.")
     if access.get("longDescription") is not None and not _optional_text(access.get("longDescription"), 12000):
         raise ValueError("Media long description is invalid.")
@@ -108,13 +108,13 @@ def _validate_relations(relations):
             raise ValueError(f"Media relationship {key} is invalid.")
 
 
-def _safe_source(value, local_allowed=True):
+def _safe_source(value, local_allowed=True, https_allowed=True):
     if not _text(value, 2000):
         return False
     if local_allowed and value.startswith("/") and not value.startswith("//"):
         return True
     parsed = urlparse(value)
-    return parsed.scheme == "https" and bool(parsed.netloc)
+    return https_allowed and parsed.scheme == "https" and bool(parsed.netloc)
 
 
 def _optional_text(value, maximum):

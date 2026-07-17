@@ -24,7 +24,9 @@ The schema uses safe structured rich text nodes. It deliberately does not render
 
 The current types are text, rich text, image, video, audio, reflection, quiz, interactive exercise, reading passage, conversation prompt, recording activity, resource download, checkpoint, and `Why this?` evidence panel. Lesson metadata reserves `programId`, `pathIds`, and `unitId` so future programs can use the same player without changing the lesson contract.
 
-Media must include a transcript; video also requires captions; images require alternative text. The registry also declares renderer-required `content` fields, such as a reflection prompt or reading passage. Validation checks both presence and renderer-specific structure: rich text needs safe structured nodes, quizzes need structured options with one correct answer, and resource links must use safe hrefs. Malformed authored content therefore fails closed before it can crash a renderer. Image, audio, and video load failures show the same accessible alternative rather than leaving an empty or broken control. Recording blocks must always expose a no-recording route.
+Media must include a transcript; video also requires captions; images require alternative text. Image, audio, and video blocks can pin a governed `assetRef` containing an exact asset id, positive version, and locale while retaining `content.src` as a bundled recovery path. `mediaResolver.js` accepts only an exact kind-matched revision with all three published review checks and applies its source and accessibility alternatives. Missing delivery therefore preserves usable bundled content rather than blanking the lesson.
+
+The registry also declares renderer-required `content` fields, such as a reflection prompt or reading passage. Validation checks both presence and renderer-specific structure: rich text needs safe structured nodes, quizzes need structured options with one correct answer, and resource links must use safe hrefs. Malformed authored content therefore fails closed before it can crash a renderer. Image, audio, and video load failures show the same accessible alternative rather than leaving an empty or broken control. Recording blocks must always expose a no-recording route.
 
 ## Evidence And Safety
 
@@ -51,8 +53,8 @@ Academy routes are `#academy`, `#academy/:courseSlug`, and `#academy/:courseSlug
 
 ## Accessibility
 
-The player uses semantic headings, labelled progress, visible controls, native media controls, keyboard-operable buttons, live announcements for current state, no colour-only status, and responsive layouts. Left and right arrow navigation works when focus is not in a control; normal tab navigation remains the primary documented interaction. A future media service must provide real caption and transcript assets rather than treating those fields as decorative metadata.
+The player uses semantic headings, labelled progress, visible controls, native media controls, keyboard-operable buttons, live announcements for current state, no colour-only status, and responsive layouts. Left and right arrow navigation works when focus is not in a control; normal tab navigation remains the primary documented interaction. The governed media boundary requires real caption and transcript assets before review rather than treating those fields as decorative metadata.
 
 ## Content Revision Policy
 
-Published content must be immutable by `id` + `version`. A material change creates a new version and keeps its previous version reference for audit and learner-resume decisions. The current static preview is an implementation fixture, and the first reviewed Foundations lessons are documented in [Foundations Course: First Four Lessons](foundations-lessons.md). Server-side draft/publish/review work is intentionally deferred to Milestone 5.
+Published content must be immutable by `id` + `version`. A material change creates a new version and keeps its previous version reference for audit and learner-resume decisions. Courses pin lesson revisions, and lessons pin governed media revisions, so later publication cannot silently change an existing learner path. The bundled catalogue remains a recovery fixture; the governed author, review, publish, and public-delivery workflow is the normal production path.

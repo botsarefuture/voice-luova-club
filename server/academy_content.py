@@ -153,6 +153,9 @@ def _validate_block(block, evidence_ids):
     if block_type in {"image", "audio", "video"}:
         if not _text(content.get("src"), 2000):
             raise ValueError("Media needs a source.")
+        asset_ref = content.get("assetRef")
+        if asset_ref is not None and (not isinstance(asset_ref, dict) or not _text(asset_ref.get("id"), 120) or not isinstance(asset_ref.get("version"), int) or asset_ref["version"] < 1 or not _text(asset_ref.get("locale"), 20)):
+            raise ValueError("Governed media references need an id, positive version, and locale.")
         accessibility = block["accessibility"]
         if block_type == "image" and not _text(accessibility.get("alternative"), 2000):
             raise ValueError("Images need alternative text.")

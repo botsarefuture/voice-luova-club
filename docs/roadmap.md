@@ -9,9 +9,9 @@
 | Item | Current state |
 | --- | --- |
 | Current milestone | Milestone 6 - Educational Media Pipeline |
-| Current version | `v0.3.32` |
-| Current working branch | `feat/academy-media-library` |
-| Active pull request(s) | PR #20 - Governed Academy media library; PR #19 is integrated into `main`. |
+| Current version | `v0.3.33` |
+| Current working branch | `feat/academy-media-resolution` |
+| Active pull request(s) | PR #21 - Deterministic governed lesson-media resolution; PR #20 is integrated into `main`. |
 | Base branch | `main` is canonical. |
 | Next planned milestone | Continue Milestone 6 with deterministic lesson asset references and public resolution. |
 | Overall completion estimate | About 40% of the long-term Academy vision; engine, history, governance, authoring, and delivery are complete, while media, remaining curriculum, and coaching remain substantial work. |
@@ -56,6 +56,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 - `v0.3.30` - Blank Academy authoring and immutable course/lesson revision paths
 - `v0.3.31` - Governed Academy media library and publication workflow
 - `v0.3.32` - Governed media-library pull-request readiness
+- `v0.3.33` - Deterministic governed lesson-media resolution
 
 Update this list whenever a versioned change is pushed so milestones, pull requests, and releases remain easy to correlate.
 
@@ -435,8 +436,10 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 - [x] Read-only public media manifest exposes only published revisions and carries cache directives.
 - [x] Admin Media Library supports draft, review, publish, replacement, and localization metadata workflows.
 - [x] Drafts may be incomplete, while review submission rejects placeholders and missing rights or accessible alternatives.
-- [ ] Lesson media blocks reference deterministic governed asset revisions and resolve them through the public manifest.
-- [ ] Validate replacement and localization resolution with real Foundations lesson content.
+- [x] Lesson media blocks reference deterministic governed asset revisions and resolve them through the public manifest.
+- [x] Public delivery retains every immutable published revision so older lesson pins remain reproducible after replacement.
+- [x] Validate exact-revision resolution and bundled fallback through the staging learner experience.
+- [ ] Validate localization resolution with real Foundations lesson content.
 
 ### Milestone 7 - Remaining Foundations Lessons
 
@@ -539,3 +542,5 @@ The existing `interactive_exercise` block remains suitable for simple learner-le
 - **2026-07-17:** Milestone 5 completed after a clean staging run proved author/reviewer/publisher permissions, draft privacy, four-lesson Foundations publication, cacheable public delivery, desktop/mobile learner rendering, bundled fallback behavior, and clean-volume reproducibility.
 - **2026-07-17:** A roadmap truth audit found missing blank-authoring controls and no practical revision path for published courses. The closure patch adds blank documents, explicit next-version actions, versioned course lineage, and deterministic lesson references before Milestone 6 resumes.
 - **2026-07-17:** Milestone 6 begins with a governed media library. Authors can save incomplete private drafts, but only real checksummed assets with complete rights and kind-specific accessibility metadata may enter role-separated review and publication. Published metadata is exposed through a cacheable read-only manifest; lesson resolution follows in the next focused slice.
+- **2026-07-17:** Governed lesson media uses an exact `{id, version, locale}` reference plus a bundled fallback source. The public manifest retains every published immutable revision, and the learner resolver uses only a kind-matched, fully reviewed exact revision; unavailable delivery never blanks a lesson.
+- **2026-07-17:** Staging published the real “How voice learning works” lesson and a one-lesson Foundations course through the author, reviewer, and publisher identities. The learner player consumed the pinned media revision and its governed alternative text on desktop and 390px mobile. HTML now uses `no-cache` so deployments discover hashed bundles while public manifests remain cacheable.

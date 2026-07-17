@@ -338,12 +338,18 @@ function BlockContentFields({ block, updateContent, onChange }) {
     case "checkpoint": return <Field label="Checkpoint message" value={content.message ?? ""} onChange={(value) => updateContent("message", value)} multiline required />;
     case "why_this": return <Field label="Evidence explanation" value={content.prompt ?? ""} onChange={(value) => updateContent("prompt", value)} multiline />;
     case "resource_download": return <div className="admin-form-grid"><Field label="Resource label" value={content.label ?? ""} onChange={(value) => updateContent("label", value)} required /><Field label="Resource URL" value={content.href ?? ""} onChange={(value) => updateContent("href", value)} required /></div>;
-    case "image": return <div className="admin-form-grid"><Field label="Image URL" value={content.src ?? ""} onChange={(value) => updateContent("src", value)} /><Field label="Caption" value={content.caption ?? ""} onChange={(value) => updateContent("caption", value)} multiline /></div>;
+    case "image": return <div className="admin-form-grid"><MediaReferenceFields content={content} updateContent={updateContent} sourceLabel="Image fallback URL" /><Field label="Caption" value={content.caption ?? ""} onChange={(value) => updateContent("caption", value)} multiline /></div>;
     case "audio":
-    case "video": return <Field label={`${block.type === "audio" ? "Audio" : "Video"} URL`} value={content.src ?? ""} onChange={(value) => updateContent("src", value)} />;
+    case "video": return <div className="admin-form-grid"><MediaReferenceFields content={content} updateContent={updateContent} sourceLabel={`${block.type === "audio" ? "Audio" : "Video"} fallback URL`} /></div>;
     case "quiz": return <QuizFields block={block} updateContent={updateContent} onChange={onChange} />;
     default: return <p className="lesson-muted">This block does not currently need additional content.</p>;
   }
+}
+
+function MediaReferenceFields({ content, updateContent, sourceLabel }) {
+  const reference = content.assetRef ?? { id: "", version: 1, locale: "en" };
+  const updateReference = (field, value) => updateContent("assetRef", { ...reference, [field]: value });
+  return <><Field label={sourceLabel} value={content.src ?? ""} onChange={(value) => updateContent("src", value)} required hint="Used only if governed media delivery is unavailable." /><Field label="Governed asset ID" value={reference.id} onChange={(value) => updateReference("id", value)} hint="Pin the exact published asset revision used by this lesson." /><Field label="Asset version" value={reference.version} type="number" min="1" onChange={(value) => updateReference("version", numberOrZero(value))} /><Field label="Asset locale" value={reference.locale} onChange={(value) => updateReference("locale", value)} />{content.assetRef && <button type="button" className="text-action" onClick={() => updateContent("assetRef", undefined)}>Use bundled media only</button>}</>;
 }
 
 function QuizFields({ block, updateContent, onChange }) {

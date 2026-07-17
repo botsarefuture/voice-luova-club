@@ -35,6 +35,13 @@ class AcademyMediaTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_media_asset(asset)
 
+    def test_delivery_sources_stay_same_origin_while_rights_may_link_out(self):
+        asset = illustration()
+        asset["source"] = "https://cdn.example.org/pathway.jpg"
+        asset["rights"]["sourceUrl"] = "https://example.org/original"
+        with self.assertRaisesRegex(ValueError, "metadata"):
+            validate_media_asset(asset)
+
     def test_incomplete_media_can_be_saved_as_a_draft_but_not_submitted(self):
         asset = illustration()
         asset["review"] = {"decision": "pending", "content_checked": False, "research_checked": False, "accessibility_checked": False}
@@ -60,11 +67,11 @@ class AcademyMediaTests(unittest.TestCase):
         asset["relations"] = {"replaces": {"id": "voice-pathway", "version": 1, "locale": "en"}}
         self.assertEqual(validate_media_asset(asset)["relations"]["replaces"]["version"], 1)
 
-    def test_public_manifest_exposes_only_latest_locale_revision(self):
+    def test_public_manifest_keeps_every_published_revision_addressable(self):
         manifest = build_public_media_manifest([
             {"asset": illustration(1)},
             {"asset": illustration(2)},
             {"asset": illustration(1, "fi")},
         ])
-        self.assertEqual([(item["locale"], item["version"]) for item in manifest["assets"]], [("en", 2), ("fi", 1)])
+        self.assertEqual([(item["locale"], item["version"]) for item in manifest["assets"]], [("en", 1), ("en", 2), ("fi", 1)])
         self.assertNotIn("decision", manifest["assets"][0]["review"])

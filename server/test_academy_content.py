@@ -15,6 +15,14 @@ class AcademyContentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_lesson_document(broken)
 
+    def test_lesson_media_reference_requires_an_exact_revision(self):
+        document = lesson()
+        document["blocks"] = [{"id": "pathway", "type": "image", "version": 1, "metadata": {}, "durationMinutes": 1, "completion": {"kind": "manual"}, "accessibility": {"alternative": "A sound pathway."}, "safety": {}, "evidenceRefs": ["source"], "content": {"src": "/academy/voice-pathway.jpg", "assetRef": {"id": "voice-pathway", "version": 1, "locale": "en"}}}]
+        self.assertEqual(validate_lesson_document(document)["blocks"][0]["content"]["assetRef"]["version"], 1)
+        document["blocks"][0]["content"]["assetRef"]["version"] = 0
+        with self.assertRaisesRegex(ValueError, "Governed media"):
+            validate_lesson_document(document)
+
     def test_review_requires_all_review_dimensions(self):
         self.assertEqual(validate_review({"decision": "approved", "content_checked": True, "research_checked": True, "accessibility_checked": True})["decision"], "approved")
         with self.assertRaises(ValueError):

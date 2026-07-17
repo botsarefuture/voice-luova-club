@@ -92,6 +92,16 @@ test("schema rejects unsafe or incomplete media before a lesson can render", () 
   assert.match(result.errors.join(" "), /captions/);
 });
 
+test("schema validates deterministic governed media references", () => {
+  const lesson = structuredClone(FOUNDATIONS_LESSONS.find((item) => item.slug === "how-voice-learning-works"));
+  assert.equal(validateLesson(lesson).valid, true);
+  const image = lesson.blocks.find((block) => block.type === "image");
+  image.content.assetRef = { id: "voice-pathway", version: 0, locale: "" };
+  const result = validateLesson(lesson);
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join(" "), /governed media reference/);
+});
+
 test("schema rejects missing type-specific content before it creates a blank lesson step", () => {
   const invalid = structuredClone(LESSON_PLAYER_PREVIEW);
   invalid.blocks = [{
