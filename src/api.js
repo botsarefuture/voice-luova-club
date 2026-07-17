@@ -147,6 +147,28 @@ export async function loadAdminFeedback() {
   return response.json();
 }
 
+export async function listAcademyAdminLessons() {
+  const response = await fetch("/api/admin/academy/lessons", { headers: { Accept: "application/json" } });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || "Could not load Academy lessons.");
+  }
+  return response.json();
+}
+
+export async function loadAcademyAdminLesson(id, version) {
+  const response = await fetch(`/api/admin/academy/lessons/${encodeURIComponent(id)}/${version}`, { headers: { Accept: "application/json" } });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || "Could not load this lesson revision.");
+  }
+  return response.json();
+}
+
+export async function saveAcademyAdminLesson(id, version, lesson, changeNote) {
+  return secureRequest(`/api/admin/academy/lessons/${encodeURIComponent(id)}/${version}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lesson, change_note: changeNote }) });
+}
+
 export async function listPrivateRecordings() {
   const response = await fetch("/api/recordings", { headers: { Accept: "application/json" } });
   if (!response.ok) throw new Error("Could not load private recordings.");

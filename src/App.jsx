@@ -56,6 +56,7 @@ import {
 } from "./storage";
 import { decryptRecording, deriveRecordingKey, encryptRecording } from "./recordings";
 import AcademyView from "./academy/AcademyView";
+import AdminAcademy from "./academy/AdminAcademy";
 import { academyRoute, parseAppRoute } from "./academy/routes";
 import { addAcademyJournalEntry, clearAcademyHistory, loadAcademyHistory, mergeAcademyHistories, recordLessonActivity, saveAcademyHistory } from "./academy/learnerHistory";
 import { APP_VERSION } from "./version";
@@ -80,6 +81,7 @@ const APP_VIEWS = [
   { id: "privacy", label: "Privacy", icon: ShieldCheck },
   { id: "feedback", label: "Feedback", icon: MessageCircle },
   { id: "admin-feedback", label: "Feedback inbox", icon: Inbox },
+  { id: "admin-academy", label: "Academy authoring", icon: BookOpen },
 ];
 const MAIN_VIEW_IDS = new Set(["today", "practice", "progress", "academy", "learn", "guide"]);
 
@@ -1463,7 +1465,7 @@ export default function App() {
         <section className="view-intro">
           <p className="eyebrow">FemmeVoice</p>
           <h1>{APP_VIEWS.find((view) => view.id === activeView)?.label}</h1>
-          <p>{activeView === "practice" ? "One calm exercise at a time. Stop any time your voice stops feeling easy." : activeView === "progress" ? "Your practice history, range notes, and gentle next steps." : activeView === "academy" ? "A private, structured place to learn one useful thing at a time." : activeView === "learn" ? "Simple explanations first, then deeper resources whenever you want them." : activeView === "guide" ? "What FemmeVoice is based on, what its measurements mean, and where the evidence has limits." : activeView === "privacy" ? "A plain-language account of what FemmeVoice stores, why, and how you stay in control." : activeView === "feedback" ? "Tell us what feels useful, unclear, missing, or unsafe. Thoughtful feedback shapes FemmeVoice." : activeView === "admin-feedback" ? "Private feedback review for FemmeVoice administrators." : "Your private FemmeVoice account, preferences, and safety information."}</p>
+          <p>{activeView === "practice" ? "One calm exercise at a time. Stop any time your voice stops feeling easy." : activeView === "progress" ? "Your practice history, range notes, and gentle next steps." : activeView === "academy" ? "A private, structured place to learn one useful thing at a time." : activeView === "learn" ? "Simple explanations first, then deeper resources whenever you want them." : activeView === "guide" ? "What FemmeVoice is based on, what its measurements mean, and where the evidence has limits." : activeView === "privacy" ? "A plain-language account of what FemmeVoice stores, why, and how you stay in control." : activeView === "feedback" ? "Tell us what feels useful, unclear, missing, or unsafe. Thoughtful feedback shapes FemmeVoice." : activeView === "admin-feedback" ? "Private feedback review for FemmeVoice administrators." : activeView === "admin-academy" ? "Draft, review, and preview structured Academy lessons." : "Your private FemmeVoice account, preferences, and safety information."}</p>
         </section>
       )}
 
@@ -2092,6 +2094,7 @@ export default function App() {
         <button onClick={() => navigateTo("feedback")}><MessageCircle /> Share feedback</button>
         <button onClick={() => navigateTo("privacy")}><ShieldCheck /> Privacy policy</button>
         {authInfo.user?.is_admin && <button onClick={() => navigateTo("admin-feedback")}><Inbox /> Feedback inbox</button>}
+        {authInfo.user?.academy_roles?.length > 0 && <button onClick={() => navigateTo("admin-academy")}><BookOpen /> Academy authoring</button>}
       </nav>
 
       {authInfo.authenticated && <section className="settings-band account-security" aria-label="Account and data controls">
@@ -2255,6 +2258,8 @@ export default function App() {
         {adminFeedbackStatus && <p className="alert">{adminFeedbackStatus}</p>}
         {!adminFeedbackLoading && !adminFeedbackStatus && <div className="admin-feedback-list">{adminFeedback.length > 0 ? adminFeedback.map((item) => <article key={item.id} className={`feedback-item feedback-${item.category}`}><div><span>{formatFeedbackCategory(item.category)}</span><time dateTime={item.created_at}>{formatFeedbackDate(item.created_at)}</time></div><p>{item.message}</p></article>) : <p className="admin-feedback-empty">No feedback has been received yet.</p>}</div>}
       </section> : <section className="admin-feedback-page"><h2>Administrator access required</h2><p>This area is not available for this account.</p></section>)}
+
+      {activeView === "admin-academy" && (authInfo.user?.academy_roles?.length ? <AdminAcademy roles={authInfo.user.academy_roles} /> : <section className="admin-feedback-page"><h2>Academy authoring access required</h2><p>This area is available only to authorised Academy contributors.</p></section>)}
 
       {accountMode && (
         <div className="account-modal" role="dialog" aria-modal="true" aria-labelledby="account-title">
