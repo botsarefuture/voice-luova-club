@@ -2,18 +2,18 @@
 
 **Status:** living implementation guide  
 **Last updated:** 17 July 2026  
-**Current development phase:** Milestone 6 - Educational Media Pipeline, in progress
+**Current development phase:** Milestone 5 authoring closure, ready for validation before Milestone 6 resumes
 
 ## Active Development
 
 | Item | Current state |
 | --- | --- |
-| Current milestone | Milestone 6 - Educational Media Pipeline, in progress |
-| Current version | `v0.3.29` |
-| Current working branch | `feat/academy-media-foundation` |
-| Active pull request(s) | Media-contract PR in preparation; PR #17 is integrated into `main`. |
+| Current milestone | Milestone 5 authoring closure: blank creation and explicit revision paths |
+| Current version | `v0.3.30` |
+| Current working branch | `fix/academy-authoring-closure` |
+| Active pull request(s) | PR #19 - Academy authoring closure; PR #18 is integrated into `main`. |
 | Base branch | `main` is canonical. |
-| Next planned milestone | Milestone 6 - Educational Media Pipeline |
+| Next planned milestone | Resume Milestone 6 - Educational Media Pipeline |
 | Overall completion estimate | About 40% of the long-term Academy vision; engine, history, governance, authoring, and delivery are complete, while media, remaining curriculum, and coaching remain substantial work. |
 
 ## Vision
@@ -53,6 +53,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 - `v0.3.27` - Local Academy staging workflow
 - `v0.3.28` - Milestone 5 end-to-end governance validation
 - `v0.3.29` - Versioned educational media contract
+- `v0.3.30` - Blank Academy authoring and immutable course/lesson revision paths
 
 Update this list whenever a versioned change is pushed so milestones, pull requests, and releases remain easy to correlate.
 
@@ -98,6 +99,7 @@ This keeps history understandable without forcing unrelated work into a prematur
 | 2026-07-17 | Treat the first four Foundations lessons as an MVP slice, not the complete course. | Remaining lessons will follow after learner history and content operations are established. |
 | 2026-07-17 | Keep Academy learner history local and separate from legacy practice progress. | It gives learners useful reflection and deletion/export controls without silently expanding account data collection. |
 | 2026-07-17 | Make structured forms the normal lesson-authoring route; retain raw lesson JSON only as an advanced escape hatch. | It makes routine editing safer and more approachable without creating a second content schema or blocking carefully reviewed low-level changes. |
+| 2026-07-17 | Version courses independently and pin lesson revisions at publication. | Published course paths must remain reproducible when a lesson or the course is revised later. |
 
 ## Milestones
 
@@ -238,13 +240,13 @@ The generic engine is complete and has been validated with real, production-qual
 **Dependencies:** Milestones 2-3
 
 **Acceptance criteria**
-- [ ] Complete Milestones 4A and 4B below without changing the legacy `voice-training:progress` contract.
-- [ ] Existing `voice-training:progress` version 1 remains readable and untouched.
-- [ ] Data model is generic enough for future programs, optional confidence/ease history, transparent coach rules, and privacy-preserving aggregates.
+- [x] Complete Milestones 4A and 4B below without changing the legacy `voice-training:progress` contract.
+- [x] Existing `voice-training:progress` version 1 remains readable and untouched.
+- [x] Data model is generic enough for future programs, optional confidence/ease history, transparent coach rules, and privacy-preserving aggregates.
 
 #### Milestone 4A - Local History And Reflection
 
-**Status:** 👀 Ready for Review
+**Status:** ✅ Completed
 **Goal:** Give learners a private, local record of completed lessons, active learning time, recently practised lessons, a short calendar, weekly summary, and optional notes.
 **Dependencies:** Milestones 2-3
 
@@ -271,7 +273,7 @@ The generic engine is complete and has been validated with real, production-qual
 - [x] Explicit enable/disable state, deterministic merge policy, account export, and deletion.
 - [x] Server-side payload limits, CSRF/auth checks, and privacy tests.
 
-**Implemented, pending review**
+**Implemented and merged**
 - [x] Account-only sync setting; disabling deletes the synced account copy after confirmation while retaining local history.
 - [x] Separate `academy_history` collection with a one-account record, versioned payload boundary, and no-store API responses.
 - [x] Deterministic client merge for sessions, notes, and lesson revisions.
@@ -369,8 +371,8 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 - [x] Available lesson picker, duplicate prevention, and keyboard-accessible earlier/later/remove ordering controls.
 - [x] Saved course draft browser and real Foundations course fixture.
 
-**Remaining**
-- [ ] Validate the complete course-management workflow against migrated Foundations content.
+**Validated**
+- [x] The complete course-management workflow passed the isolated Foundations publication run.
 
 #### Milestone 5G - Review And Publishing Workflow
 
@@ -400,17 +402,19 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 
 **Validated:** The isolated Compose stack published four Foundations lessons and one course through separate development identities, rendered four governed lessons on desktop and 390px mobile, and rebuilt reproducibly from a new Mongo volume.
 
+**Post-completion closure:** Blank lesson/course creation, explicit next-revision actions, versioned course records, and pinned published lesson references close gaps found by the roadmap audit. Existing unversioned course records migrate to version 1 without deleting content. A clean staging run verified author/reviewer/publisher separation, lesson v1 pinning after lesson v2 publication, course v2 publication, cache headers, mobile layout, and clean-volume reproducibility.
+
 ### Milestone 5 Retrospective
 
 - **Accomplished:** structured course and lesson authoring, immutable revisions, role-separated review/publishing, cacheable public delivery, bundled recovery content, and isolated contributor staging.
 - **Key decision:** the public catalogue includes a course only when the course and every ordered lesson are published; partial migrations remain invisible.
 - **Learned:** real content exposed a client/server media-validation mismatch that fixture-only tests missed. Publishing validation must exercise both schema boundaries.
-- **Technical debt:** course revisions currently use one immutable published record per course id; a future content-operations slice should add explicit course-version lineage before multiple published course revisions are needed.
+- **Technical debt:** the one-time course index migration must run before production creates a second course revision; deployment documentation includes the exact command.
 - **Next:** Milestone 6 should establish reviewed audio, video, illustration, caption, transcript, localization, and replacement workflows before expanding media-heavy lessons.
 
 ### Milestone 6 - Educational Media Pipeline
 
-**Status:** ⏳ Planned
+**Status:** 🚧 In Progress
 **Goal:** Produce and maintain reviewed, accessible educational assets without treating media as an afterthought.
 **Complexity:** High
 **Dependencies:** Milestone 5
@@ -427,12 +431,24 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 - [x] Versioned media contract covers locale, source, rights, accessibility metadata, and three-part review.
 - [x] Existing Foundations voice-pathway illustration validates as the first real asset fixture.
 
-### Milestone 7 - Transparent Coach
+### Milestone 7 - Remaining Foundations Lessons
 
-**Status:** ⏳ Planned  
+**Status:** ⏳ Planned
+**Goal:** Complete Foundations using the proven engine, learner-history insights, structured authoring workflow, and reviewed media pipeline.
+**Complexity:** High
+**Dependencies:** Milestones 4-6
+
+**Acceptance criteria**
+- [ ] Remaining approved Foundations lessons meet the same safety, evidence, accessibility, and content-review standard as the MVP slice.
+- [ ] Lessons use real instructional media only when captions, transcripts, and review assets are ready.
+- [ ] Learner history remains optional, supportive, and useful with the expanded course.
+
+### Milestone 8 - Transparent Coach
+
+**Status:** ⏳ Planned
 **Goal:** Recommend a kind next existing lesson or practice opportunity with visible, overrideable rules.
 **Complexity:** Medium  
-**Dependencies:** Milestones 4-6
+**Dependencies:** Milestones 4-7
 
 **Acceptance criteria**
 - [ ] User-controlled time, path, confidence/ease, and recent-practice inputs.
@@ -440,23 +456,19 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 - [ ] Review, recovery, low-energy, and plateau paths guide users to existing content.
 - [ ] No opaque AI, gender scoring, diagnosis, or punishment mechanics.
 
-### Milestone 8 - Remaining Foundations Lessons
+### Backlog - Interactive Practice
 
 **Status:** ⏳ Planned
-**Goal:** Complete Foundations using the proven engine, learner-history insights, and structured authoring workflow.
-**Complexity:** High
-**Dependencies:** Milestones 4-6
+**Goal:** Add a generic, privacy-first practice engine for guided voice activities after the educational media and content foundations are stable.
 
-**Acceptance criteria**
-- [ ] Remaining approved Foundations lessons meet the same safety, evidence, accessibility, and content-review standard as the MVP slice.
-- [ ] Lessons use real instructional media only when captions, transcripts, and review assets are ready.
-- [ ] Learner history and coach recommendations remain optional, supportive, and useful with the expanded course.
+The existing `interactive_exercise` block remains suitable for simple learner-led activities. A future `interactive_practice` contract should support reusable practice types, local analysis providers, accessible non-microphone routes, and supportive observations without pass/fail scoring. Microphone analysis, pitch exploration, and recording playback are intentionally outside Milestone 6.
 
 ## Technical Debt And Risks
 
 - `src/App.jsx` owns much of the current UI and practice orchestration. New academy code must stay outside it; extracting existing practice state requires dedicated tests before it moves.
 - Existing cloud sync stores a version-1 progress blob. Academy data needs separate collections and APIs rather than silently changing that contract.
 - Academy history must remain a separate versioned contract. Milestone 4A establishes useful local history; Milestone 4B owns migration, retention, export, deletion, multi-device conflict handling, and explicit sync consent.
+- Existing production course records require the documented one-time version-index migration before a second course revision is saved.
 - Public media needs a storage/CDN strategy; do not put large course video into the existing encrypted-recording vault.
 - Lesson authoring must enforce captions, transcripts, evidence, and safety metadata, or content quality will drift.
 - Community features require funded human moderation and safeguarding; they are not a learner MVP dependency.
@@ -517,3 +529,4 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 - **2026-07-17:** The public Academy now prefers a cacheable, read-only published-content API. It excludes drafts, incomplete course paths, and unpublished lessons, and immediately falls back to bundled content when no complete published catalogue is available.
 - **2026-07-17:** Added an isolated Docker Compose staging stack and guarded development-account seed command for the author, reviewer, publisher, and administrator workflow. It is the required environment for the final Milestone 5 publication demonstration.
 - **2026-07-17:** Milestone 5 completed after a clean staging run proved author/reviewer/publisher permissions, draft privacy, four-lesson Foundations publication, cacheable public delivery, desktop/mobile learner rendering, bundled fallback behavior, and clean-volume reproducibility.
+- **2026-07-17:** A roadmap truth audit found missing blank-authoring controls and no practical revision path for published courses. The closure patch adds blank documents, explicit next-version actions, versioned course lineage, and deterministic lesson references before Milestone 6 resumes.

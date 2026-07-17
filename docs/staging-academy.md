@@ -8,4 +8,6 @@ Use the Admin Academy to load Foundations references, save every lesson and cour
 
 The seed script refuses to run unless `FEMMEVOICE_ENV=staging`; Compose uses a separate Mongo volume and database and must never be pointed at production.
 
+The local Compose profile explicitly disables the cookie `Secure` attribute because it is served over loopback HTTP. Production defaults to secure cookies and must not reuse this override.
+
 The Milestone 5 validation used separate author, reviewer, and publisher sessions. Draft and approved-but-unpublished records returned an empty public catalogue. After all four Foundations lessons and the course were published, the catalogue returned one course with four lessons and `Cache-Control: public, max-age=60, stale-while-revalidate=300`. A clean `down -v` and restart recreated an empty isolated database and the accounts seeded successfully again.

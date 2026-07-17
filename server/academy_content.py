@@ -54,15 +54,58 @@ def review_result_status(decision):
 
 
 def build_public_catalogue(course_records, lesson_records):
-    lessons_by_slug = {item["lesson"]["slug"]: item["lesson"] for item in lesson_records if item.get("lesson", {}).get("slug")}
-    courses = []
+    lesson_records_by_ref = {}
+    latest_lessons_by_slug = {}
+    for item in lesson_records:
+        lesson = item.get("lesson") or {}
+        slug = lesson.get("slug")
+        version = lesson.get("version", item.get("version", 1))
+        if not slug or not isinstance(version, int):
+            continue
+        lesson_records_by_ref[(slug, version)] = lesson
+        if version > latest_lessons_by_slug.get(slug, {}).get("version", 0):
+            latest_lessons_by_slug[slug] = lesson
+
+    latest_courses_by_slug = {}
     for record in course_records:
         course = record.get("course") or {}
-        ordered_lessons = [lessons_by_slug.get(slug) for slug in course.get("lessonIds", [])]
+        slug = course.get("slug")
+        version = course.get("version", record.get("version", 1))
+        if slug and isinstance(version, int) and version > latest_courses_by_slug.get(slug, {}).get("version", 0):
+            latest_courses_by_slug[slug] = {**record, "version": version}
+
+    courses = []
+    for record in latest_courses_by_slug.values():
+        course = record.get("course") or {}
+        references = record.get("published_lesson_refs")
+        if references:
+            ordered_lessons = [lesson_records_by_ref.get((reference.get("slug"), reference.get("version"))) for reference in references]
+        else:
+            # Legacy version-1 course records predate pinned lesson references.
+            ordered_lessons = [latest_lessons_by_slug.get(slug) for slug in course.get("lessonIds", [])]
         if not ordered_lessons or any(item is None for item in ordered_lessons):
             continue
         courses.append({"course": course, "lessons": ordered_lessons, "publishedAt": record.get("published_at")})
     return {"schemaVersion": 1, "courses": courses}
+
+
+def resolve_published_lesson_refs(course, lesson_records):
+    latest_by_slug = {}
+    for record in lesson_records:
+        lesson = record.get("lesson") or {}
+        slug = lesson.get("slug")
+        version = lesson.get("version", record.get("version", 1))
+        if slug and isinstance(version, int) and version > latest_by_slug.get(slug, 0):
+            latest_by_slug[slug] = version
+    references = []
+    for slug in course.get("lessonIds", []):
+        version = latest_by_slug.get(slug)
+        if not version:
+            raise ValueError(f"Publish lesson {slug} before publishing this course revision.")
+        references.append({"slug": slug, "version": version})
+    if not references:
+        raise ValueError("A published course needs at least one published lesson.")
+    return references
 
 
 def validate_course_document(course):
@@ -75,9 +118,13 @@ def validate_course_document(course):
         raise ValueError("Course identity is invalid.")
     if not isinstance(course["estimatedMinutes"], int) or course["estimatedMinutes"] < 0:
         raise ValueError("Course duration is invalid.")
+    version = course.get("version", 1)
+    if not isinstance(version, int) or version < 1:
+        raise ValueError("Course version must be a positive integer.")
     if not isinstance(course["lessonIds"], list) or len(course["lessonIds"]) > 100 or len(set(course["lessonIds"])) != len(course["lessonIds"]) or not all(_text(item, 120) for item in course["lessonIds"]):
         raise ValueError("Course lesson ordering is invalid.")
     clean = deepcopy(course)
+    clean["version"] = version
     clean["prerequisiteCourseIds"] = [item for item in course.get("prerequisiteCourseIds", []) if _text(item, 120)] if isinstance(course.get("prerequisiteCourseIds", []), list) else []
     clean["tags"] = [item for item in course.get("tags", []) if _text(item, 80)] if isinstance(course.get("tags", []), list) else []
     return clean

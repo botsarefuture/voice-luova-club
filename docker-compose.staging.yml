@@ -11,6 +11,7 @@ services:
       MONGO_DB: femmevoice_staging
       LEGACY_MONGO_DB: femmevoice_legacy_staging
       SECRET_KEY: femmevoice-local-staging-only-change-me
+      SESSION_COOKIE_SECURE: "false"
       PUBLIC_BASE_URL: http://127.0.0.1:5180
       FEMMEVOICE_ACADEMY_AUTHOR_USERNAMES: academy-author
       FEMMEVOICE_ACADEMY_REVIEWER_USERNAMES: academy-reviewer

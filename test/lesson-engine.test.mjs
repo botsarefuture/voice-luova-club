@@ -26,7 +26,8 @@ test("Admin Academy presents structured lesson and course authoring controls bef
   try {
     const { default: AdminAcademy } = await vite.ssrLoadModule("/src/academy/AdminAcademy.jsx");
     const html = renderToStaticMarkup(createElement(AdminAcademy, { roles: ["author"] }));
-    assert.match(html, /Start with a real lesson/);
+    assert.match(html, /New blank lesson/);
+    assert.match(html, /New course/);
     assert.match(html, /Load Foundations course/);
     assert.doesNotMatch(html, /Lesson document/);
   } finally {
