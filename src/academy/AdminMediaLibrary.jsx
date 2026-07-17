@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { CopyPlus, Image as ImageIcon, Languages, Plus, Save, Send, ShieldCheck, Stamp } from "lucide-react";
-import { listAcademyAdminMedia, loadAcademyAdminMedia, publishAcademyAdminMedia, reviewAcademyAdminMedia, saveAcademyAdminMedia, submitAcademyAdminMediaForReview } from "../api";
+import { CopyPlus, Image as ImageIcon, Languages, Plus, Save, Send, ShieldCheck, Stamp, Upload } from "lucide-react";
+import { listAcademyAdminMedia, loadAcademyAdminMedia, publishAcademyAdminMedia, reviewAcademyAdminMedia, saveAcademyAdminMedia, submitAcademyAdminMediaForReview, uploadAcademyAdminMediaFile } from "../api";
 import { createBlankMediaAsset, createMediaLocalization, createNextMediaRevision, MEDIA_KINDS, validateMediaAsset } from "./mediaSchema";
 
 const EMPTY_REVIEW = { decision: "approved", content_checked: false, research_checked: false, accessibility_checked: false, note: "" };
@@ -11,6 +11,8 @@ export default function AdminMediaLibrary({ roles }) {
   const [assetStatus, setAssetStatus] = useState("draft");
   const [review, setReview] = useState(EMPTY_REVIEW);
   const [saved, setSaved] = useState(false);
+  const [sourceFile, setSourceFile] = useState(null);
+  const [captionFile, setCaptionFile] = useState(null);
   const [status, setStatus] = useState("Loading media library...");
   const draftValidation = useMemo(() => validateMediaAsset(asset), [asset]);
   const publicationValidation = useMemo(() => validateMediaAsset(asset, { publicationReady: true }), [asset]);
@@ -31,6 +33,8 @@ export default function AdminMediaLibrary({ roles }) {
     setAssetStatus("draft");
     setReview({ ...EMPTY_REVIEW });
     setSaved(false);
+    setSourceFile(null);
+    setCaptionFile(null);
     setStatus(message);
   }
 
@@ -64,6 +68,25 @@ export default function AdminMediaLibrary({ roles }) {
     } catch (error) { setStatus(error.message); }
   }
 
+  async function uploadFile(file, destination) {
+    if (!file || !editable) return;
+    try {
+      setStatus(`Uploading ${file.name}...`);
+      const result = await uploadAcademyAdminMediaFile(file);
+      update((next) => {
+        if (destination === "captions") next.accessibility.captions = result.file.source;
+        else {
+          next.source = result.file.source;
+          next.mimeType = result.file.mimeType;
+          next.byteSize = result.file.byteSize;
+          next.checksum = result.file.checksum;
+        }
+      });
+      if (destination === "captions") setCaptionFile(null); else setSourceFile(null);
+      setStatus(`${file.name} uploaded privately. Save and publish its media revision before learners can access it.`);
+    } catch (error) { setStatus(error.message); }
+  }
+
   async function transition(action) {
     try {
       const result = action === "submit"
@@ -87,8 +110,8 @@ export default function AdminMediaLibrary({ roles }) {
       <aside aria-label="Saved media revisions"><div className="admin-media-list-heading"><strong>Media revisions</strong>{roles.includes("author") && <button type="button" className="secondary-action" onClick={() => startAsset(createBlankMediaAsset(), "New media draft created locally.")}><Plus /> New asset</button>}</div>{records.length ? <ol>{records.map((record) => <li key={`${record.asset_id}:${record.version}:${record.locale}`}><button type="button" onClick={() => openRecord(record)}><strong>{record.title}</strong><span>{record.kind} · {record.locale} · v{record.version} · {formatStatus(record.status)}</span></button></li>)}</ol> : <p className="lesson-muted">No saved media revisions.</p>}</aside>
       {!asset ? <div className="admin-media-empty"><h4>Create or choose an asset</h4><p>Start with the illustration, audio, video, document, transcript, and rights information you already have. Review happens only after the draft is complete.</p></div> : <div className="admin-media-editor">
         <div className="admin-section-heading"><div><p className="eyebrow">{formatStatus(assetStatus)}</p><h4>{asset.title}</h4></div>{assetStatus === "published" && roles.includes("author") && <div className="admin-media-revision-actions"><button type="button" className="secondary-action" onClick={() => startAsset(createNextMediaRevision(asset), `Version ${asset.version + 1} created as a private replacement draft.`)}><CopyPlus /> New version</button><button type="button" className="secondary-action" onClick={() => startAsset(createMediaLocalization(asset), "Localization draft created. Set its locale and localized accessibility text before saving.")}><Languages /> Localize</button></div>}</div>
-        <fieldset className="admin-media-fields" disabled={!editable}><legend className="sr-only">Media metadata</legend><div className="admin-form-grid"><MediaField label="Title" value={asset.title} onChange={(value) => update((next) => { next.title = value; })} required /><MediaField label="Asset ID" value={asset.id} onChange={(value) => update((next) => { next.id = value; })} required /><MediaField label="Version" value={asset.version} type="number" min="1" onChange={(value) => update((next) => { next.version = Number(value); })} required /><MediaField label="Locale" value={asset.locale} onChange={(value) => update((next) => { next.locale = value; })} required /><label>Kind<select value={asset.kind} onChange={(event) => update((next) => { next.kind = event.target.value; })}>{MEDIA_KINDS.map((kind) => <option key={kind}>{kind}</option>)}</select></label><MediaField label="Source path" value={asset.source} onChange={(value) => update((next) => { next.source = value; })} hint="Use a same-origin path such as /academy/media/example.jpg." required /><MediaField label="MIME type" value={asset.mimeType} onChange={(value) => update((next) => { next.mimeType = value; })} required /><MediaField label="Byte size" value={asset.byteSize} type="number" min="0" onChange={(value) => update((next) => { next.byteSize = Number(value); })} required /><MediaField label="SHA-256 checksum" value={asset.checksum} onChange={(value) => update((next) => { next.checksum = value; })} required /></div>
-        <div className="admin-form-columns"><fieldset><legend>Rights</legend><MediaField label="Owner" value={asset.rights.owner} onChange={(value) => update((next) => { next.rights.owner = value; })} required /><MediaField label="License" value={asset.rights.license} onChange={(value) => update((next) => { next.rights.license = value; })} required /><MediaField label="Attribution" value={asset.rights.attribution} onChange={(value) => update((next) => { next.rights.attribution = value; })} multiline /><MediaField label="Original source URL" value={asset.rights.sourceUrl} onChange={(value) => update((next) => { next.rights.sourceUrl = value; })} /></fieldset><fieldset><legend>Accessible alternatives</legend>{asset.kind === "image" && <MediaField label="Alternative text" value={asset.accessibility.alternative} onChange={(value) => update((next) => { next.accessibility.alternative = value; })} multiline required />}{["audio", "video"].includes(asset.kind) && <MediaField label="Transcript" value={asset.accessibility.transcript} onChange={(value) => update((next) => { next.accessibility.transcript = value; })} multiline required />}{asset.kind === "video" && <MediaField label="Captions URL" value={asset.accessibility.captions} onChange={(value) => update((next) => { next.accessibility.captions = value; })} required />}<MediaField label="Long description" value={asset.accessibility.longDescription} onChange={(value) => update((next) => { next.accessibility.longDescription = value; })} multiline /></fieldset></div></fieldset>
+        <fieldset className="admin-media-fields" disabled={!editable}><legend className="sr-only">Media metadata</legend>{editable && <div className="admin-media-upload"><label>Teaching file<input type="file" accept={acceptForKind(asset.kind)} onChange={(event) => setSourceFile(event.target.files?.[0] ?? null)} /><span className="field-hint">Accepted files are checked and remain private until this revision is published.</span></label><button type="button" className="secondary-action" disabled={!sourceFile} onClick={() => uploadFile(sourceFile, "source")}><Upload /> Upload teaching file</button></div>}<div className="admin-form-grid"><MediaField label="Title" value={asset.title} onChange={(value) => update((next) => { next.title = value; })} required /><MediaField label="Asset ID" value={asset.id} onChange={(value) => update((next) => { next.id = value; })} required /><MediaField label="Version" value={asset.version} type="number" min="1" onChange={(value) => update((next) => { next.version = Number(value); })} required /><MediaField label="Locale" value={asset.locale} onChange={(value) => update((next) => { next.locale = value; })} required /><label>Kind<select value={asset.kind} onChange={(event) => update((next) => { next.kind = event.target.value; })}>{MEDIA_KINDS.map((kind) => <option key={kind}>{kind}</option>)}</select></label><MediaField label="Source path" value={asset.source} onChange={(value) => update((next) => { next.source = value; })} hint="Filled automatically after upload, or use an existing same-origin path." required /><MediaField label="MIME type" value={asset.mimeType} onChange={(value) => update((next) => { next.mimeType = value; })} required /><MediaField label="Byte size" value={asset.byteSize} type="number" min="0" onChange={(value) => update((next) => { next.byteSize = Number(value); })} required /><MediaField label="SHA-256 checksum" value={asset.checksum} onChange={(value) => update((next) => { next.checksum = value; })} required /></div>
+        <div className="admin-form-columns"><fieldset><legend>Rights</legend><MediaField label="Owner" value={asset.rights.owner} onChange={(value) => update((next) => { next.rights.owner = value; })} required /><MediaField label="License" value={asset.rights.license} onChange={(value) => update((next) => { next.rights.license = value; })} required /><MediaField label="Attribution" value={asset.rights.attribution} onChange={(value) => update((next) => { next.rights.attribution = value; })} multiline /><MediaField label="Original source URL" value={asset.rights.sourceUrl} onChange={(value) => update((next) => { next.rights.sourceUrl = value; })} /></fieldset><fieldset><legend>Accessible alternatives</legend>{asset.kind === "image" && <MediaField label="Alternative text" value={asset.accessibility.alternative} onChange={(value) => update((next) => { next.accessibility.alternative = value; })} multiline required />}{["audio", "video"].includes(asset.kind) && <MediaField label="Transcript" value={asset.accessibility.transcript} onChange={(value) => update((next) => { next.accessibility.transcript = value; })} multiline required />}{asset.kind === "video" && <><MediaField label="Captions path" value={asset.accessibility.captions} onChange={(value) => update((next) => { next.accessibility.captions = value; })} required />{editable && <div className="admin-caption-upload"><label>WebVTT captions<input type="file" accept=".vtt,text/vtt" onChange={(event) => setCaptionFile(event.target.files?.[0] ?? null)} /></label><button type="button" className="secondary-action" disabled={!captionFile} onClick={() => uploadFile(captionFile, "captions")}><Upload /> Upload captions</button></div>}</>}<MediaField label="Long description" value={asset.accessibility.longDescription} onChange={(value) => update((next) => { next.accessibility.longDescription = value; })} multiline /></fieldset></div></fieldset>
         <p className={draftValidation.valid ? "admin-validation valid" : "admin-validation"}><ShieldCheck aria-hidden="true" />{assetStatus === "published" ? "Published revisions are read-only. Create a new version or localization to make changes." : assetStatus !== "draft" ? "This revision is read-only while it moves through review and publication." : !draftValidation.valid ? draftValidation.errors.join(" ") : publicationValidation.valid ? "Ready to save and submit for review." : `Draft can be saved. Before review: ${publicationValidation.errors.join(" ")}`}</p>
         <div className="admin-media-actions">{editable && <><button type="button" className="primary-action" disabled={!draftValidation.valid} onClick={saveDraft}><Save /> Save media draft</button><button type="button" className="secondary-action" disabled={!publicationValidation.valid || !saved} onClick={() => transition("submit")}><Send /> Submit for review</button></>}{assetStatus === "review_requested" && roles.includes("reviewer") && <MediaReview review={review} onChange={setReview} onSubmit={() => transition("review")} />}{assetStatus === "in_review" && roles.includes("publisher") && <button type="button" className="primary-action" onClick={() => transition("publish")}><Stamp /> Publish media</button>}</div>
       </div>}
@@ -109,4 +132,8 @@ function MediaField({ label, value, onChange, multiline = false, required = fals
 
 function formatStatus(status) {
   return ({ draft: "Draft", review_requested: "Review requested", in_review: "Approved for publication", published: "Published" })[status] ?? status;
+}
+
+function acceptForKind(kind) {
+  return ({ image: "image/jpeg,image/png,image/webp", audio: "audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/webm", video: "video/mp4,video/webm", document: "application/pdf,text/vtt,.vtt" })[kind] ?? "";
 }

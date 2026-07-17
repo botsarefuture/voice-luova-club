@@ -15,7 +15,7 @@ Transfemme voice-training web app.
 - Frontend: Vite/React static build in `dist/`
 - Backend: Flask/Gunicorn WSGI app in `server/`
 - Auth: first-party FemmeVoice username and passphrase accounts with server-side sessions
-- Database: MongoDB progress storage
+- Database: MongoDB for accounts, progress, governed Academy content, and separate private Academy media storage
 - Service: Gunicorn/Flask backend
 - Admin feedback inbox: server-side administrator allowlist via `FEMMEVOICE_ADMIN_USERNAMES` (comma-separated lowercase usernames); never grant admin access from the browser
 

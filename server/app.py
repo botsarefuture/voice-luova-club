@@ -6,22 +6,25 @@ import smtplib
 import urllib.parse
 import urllib.request
 import uuid
+import tempfile
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from bson import ObjectId
-from flask import Flask, Response, jsonify, redirect, request, send_from_directory, session
+from flask import Flask, Response, jsonify, redirect, request, send_from_directory, session, stream_with_context
 from gridfs import GridFSBucket
 from gridfs.errors import NoFile
 from pymongo import ASCENDING, MongoClient
 from pymongo.errors import DuplicateKeyError, PyMongoError
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
 from academy_history import normalize_academy_history
 from academy_content import build_public_catalogue, can_submit_for_review, resolve_published_lesson_refs, review_result_status, validate_course_document, validate_lesson_document, validate_review
 from academy_media import build_public_media_manifest, media_review_result_status, validate_media_asset, validate_media_review
+from academy_media_files import ACADEMY_MEDIA_FILE_LIMIT, parse_byte_range, validate_academy_media_file
 from reminder_logic import VALID_REMINDER_TONES, normalize_reminder_days
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -86,7 +89,9 @@ academy_history_collection = db["academy_history"]
 academy_lessons_collection = db["academy_lessons"]
 academy_courses_collection = db["academy_courses"]
 academy_media_collection = db["academy_media"]
+academy_media_files_collection = db["academy_media_files.files"]
 recordings_bucket = GridFSBucket(db, bucket_name="private_recordings")
+academy_media_bucket = GridFSBucket(db, bucket_name="academy_media_files")
 progress_collection.create_index([("device_id", ASCENDING)])
 progress_collection.create_index([("storage_key", ASCENDING)], unique=True)
 users_collection.create_index([("username_normalized", ASCENDING)], unique=True)
@@ -118,9 +123,10 @@ def apply_security_headers(response):
     if request.is_secure:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     public_academy_paths = {"/api/academy/content", "/api/academy/media"}
+    public_academy_request = request.path in public_academy_paths or request.path.startswith("/api/academy/media/files/")
     if response.mimetype == "text/html":
         response.headers["Cache-Control"] = "no-cache"
-    elif request.path.startswith("/api/auth/") or request.path.startswith("/api/privacy/") or request.path.startswith("/api/recordings") or request.path.startswith("/api/admin/") or (request.path.startswith("/api/academy/") and request.path not in public_academy_paths) or request.path.startswith("/api/account/academy-history"):
+    elif request.path.startswith("/api/auth/") or request.path.startswith("/api/privacy/") or request.path.startswith("/api/recordings") or request.path.startswith("/api/admin/") or (request.path.startswith("/api/academy/") and not public_academy_request) or request.path.startswith("/api/account/academy-history"):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -567,6 +573,59 @@ def public_academy_media():
     return response
 
 
+@app.get("/api/academy/media/files/<file_id>")
+def public_academy_media_file(file_id):
+    source = f"/api/academy/media/files/{file_id}"
+    if not academy_media_collection.find_one({"status": "published", "$or": [{"asset.source": source}, {"asset.accessibility.captions": source}]}, {"_id": 1}):
+        return auth_error("Published Academy media was not found.", 404)
+    try:
+        stream = academy_media_bucket.open_download_stream(ObjectId(file_id))
+    except Exception:
+        return auth_error("Published Academy media is unavailable.", 404)
+
+    metadata = stream.metadata or {}
+    checksum = metadata.get("checksum", "").removeprefix("sha256:")
+    if checksum and request.if_none_match.contains(checksum):
+        stream.close()
+        response = Response(status=304, mimetype=metadata.get("mime_type", "application/octet-stream"))
+        response.set_etag(checksum)
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+    try:
+        byte_range = parse_byte_range(request.headers.get("Range"), stream.length)
+    except ValueError:
+        stream.close()
+        response = Response(status=416)
+        response.headers["Content-Range"] = f"bytes */{stream.length}"
+        return response
+    start, end = byte_range or (0, stream.length - 1)
+    stream.seek(start)
+
+    def chunks():
+        remaining = end - start + 1
+        try:
+            while remaining > 0:
+                chunk = stream.read(min(64 * 1024, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+        finally:
+            stream.close()
+
+    response = Response(stream_with_context(chunks()), status=206 if byte_range else 200, mimetype=metadata.get("mime_type", "application/octet-stream"))
+    response.content_length = end - start + 1
+    if checksum:
+        response.set_etag(checksum)
+    response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    response.headers["Accept-Ranges"] = "bytes"
+    if byte_range:
+        response.headers["Content-Range"] = f"bytes {start}-{end}/{stream.length}"
+    disposition = "attachment" if metadata.get("mime_type") == "application/pdf" else "inline"
+    response.headers["Content-Disposition"] = f'{disposition}; filename="{metadata.get("filename", "academy-media")}"'
+    return response
+
+
 @app.get("/api/admin/academy/media")
 def list_academy_media_for_admin():
     user = user_from_request()
@@ -574,6 +633,51 @@ def list_academy_media_for_admin():
         return auth_error("Academy media access is required.", 403)
     records = list(academy_media_collection.find({}, {"_id": 0, "asset": 0}).sort("updated_at", -1).limit(1000))
     return jsonify({"roles": user["academy_roles"], "assets": records})
+
+
+@app.post("/api/admin/academy/media/files")
+def upload_academy_media_file():
+    if not csrf_required():
+        return auth_error("Your session expired. Refresh and try again.", 403)
+    user = academy_user_with_role("author")
+    if not user:
+        return auth_error("Academy author access is required.", 403)
+    if request.content_length and request.content_length > ACADEMY_MEDIA_FILE_LIMIT + 1_000_000:
+        return auth_error("Academy media files must be 100 MB or smaller.", 413)
+    upload = request.files.get("file")
+    if not upload or not upload.filename:
+        return auth_error("Choose a media file to upload.")
+    filename = secure_filename(upload.filename)[:180] or "academy-media"
+    mime_type = (upload.mimetype or "").lower()
+    digest = hashlib.sha256()
+    size = 0
+    try:
+        with tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024) as staged:
+            while True:
+                chunk = upload.stream.read(1024 * 1024)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > ACADEMY_MEDIA_FILE_LIMIT:
+                    return auth_error("Academy media files must be 100 MB or smaller.", 413)
+                digest.update(chunk)
+                staged.write(chunk)
+            staged.seek(0)
+            leading_bytes = staged.read(32)
+            try:
+                validate_academy_media_file(mime_type, leading_bytes, size)
+            except ValueError as error:
+                return auth_error(str(error))
+            checksum = f"sha256:{digest.hexdigest()}"
+            existing = academy_media_files_collection.find_one({"metadata.checksum": checksum, "metadata.mime_type": mime_type})
+            if existing:
+                file_id = existing["_id"]
+            else:
+                staged.seek(0)
+                file_id = academy_media_bucket.upload_from_stream(filename, staged, metadata={"filename": filename, "mime_type": mime_type, "byte_size": size, "checksum": checksum, "uploaded_by": user["username"], "uploaded_at": now_iso()})
+    except Exception:
+        return auth_error("The Academy media file could not be stored.", 503)
+    return jsonify({"file": {"source": f"/api/academy/media/files/{file_id}", "filename": filename, "mimeType": mime_type, "byteSize": size, "checksum": checksum}}), 201
 
 
 @app.get("/api/admin/academy/media/<asset_id>/<int:version>/<locale>")

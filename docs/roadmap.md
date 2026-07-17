@@ -2,19 +2,19 @@
 
 **Status:** living implementation guide  
 **Last updated:** 17 July 2026  
-**Current development phase:** Milestone 6 educational media governance and delivery
+**Current development phase:** Milestone 6 complete; ready for the remaining Foundations curriculum
 
 ## Active Development
 
 | Item | Current state |
 | --- | --- |
-| Current milestone | Milestone 6 - Educational Media Pipeline |
-| Current version | `v0.3.33` |
-| Current working branch | `feat/academy-media-resolution` |
-| Active pull request(s) | PR #21 - Deterministic governed lesson-media resolution; PR #20 is integrated into `main`. |
+| Current milestone | Milestone 6 - Educational Media Pipeline completed |
+| Current version | `v0.3.34` |
+| Current working branch | `main` after the Milestone 6 completion integration |
+| Active pull request(s) | None after PR #22 - Private Academy media storage and immutable delivery - integrates into `main`. |
 | Base branch | `main` is canonical. |
-| Next planned milestone | Continue Milestone 6 with deterministic lesson asset references and public resolution. |
-| Overall completion estimate | About 40% of the long-term Academy vision; engine, history, governance, authoring, and delivery are complete, while media, remaining curriculum, and coaching remain substantial work. |
+| Next planned milestone | Milestone 7 - Remaining Foundations Lessons |
+| Overall completion estimate | About 45% of the long-term Academy vision; engine, history, governance, authoring, and media delivery are complete, while the full curriculum, interactive practice, and coaching remain substantial work. |
 
 ## Vision
 
@@ -57,6 +57,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 - `v0.3.31` - Governed Academy media library and publication workflow
 - `v0.3.32` - Governed media-library pull-request readiness
 - `v0.3.33` - Deterministic governed lesson-media resolution
+- `v0.3.34` - Private Academy media storage and immutable delivery
 
 Update this list whenever a versioned change is pushed so milestones, pull requests, and releases remain easy to correlate.
 
@@ -417,7 +418,7 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 
 ### Milestone 6 - Educational Media Pipeline
 
-**Status:** 🚧 In Progress
+**Status:** ✅ Completed
 **Goal:** Produce and maintain reviewed, accessible educational assets without treating media as an afterthought.
 **Complexity:** High
 **Dependencies:** Milestone 5
@@ -425,10 +426,10 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 **Why here:** The engine and authoring workflow must be stable before investing in a larger asset library. Content operations gives every asset a durable review, revision, and publication path.
 
 **Acceptance criteria**
-- [ ] Audio, video, illustration, caption, transcript, and localization assets have clear ownership and version linkage.
-- [ ] Research, content, and accessibility review are recorded before publication.
-- [ ] Assets have replacement, correction, and localization workflows rather than being embedded as one-off files.
-- [ ] No production teaching media is published without its required accessible alternatives.
+- [x] Audio, video, illustration, caption, transcript, and localization assets have clear ownership and version linkage.
+- [x] Research, content, and accessibility review are recorded before publication.
+- [x] Assets have replacement, correction, and localization workflows rather than being embedded as one-off files.
+- [x] No production teaching media is published without its required accessible alternatives.
 
 **In progress**
 - [x] Versioned media contract covers locale, source, rights, accessibility metadata, and three-part review.
@@ -439,7 +440,17 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 - [x] Lesson media blocks reference deterministic governed asset revisions and resolve them through the public manifest.
 - [x] Public delivery retains every immutable published revision so older lesson pins remain reproducible after replacement.
 - [x] Validate exact-revision resolution and bundled fallback through the staging learner experience.
-- [ ] Validate localization resolution with real Foundations lesson content.
+- [x] Validate replacement and localization revisions with the real Foundations pathway asset.
+- [x] Author uploads are streamed into a separate Academy GridFS bucket with a 100 MB limit, MIME signature checks, SHA-256 deduplication, and draft-private access.
+- [x] Published files support immutable ETags, conditional requests, and byte ranges for audio/video seeking.
+
+### Milestone 6 Retrospective
+
+- **Accomplished:** governed media drafts and review, immutable public manifests, exact lesson revision pins, resilient bundled fallback, author uploads, caption upload support, replacement lineage, localization lineage, and cacheable range delivery.
+- **Key decision:** project teaching assets use a separate Academy GridFS bucket. Learner recordings remain isolated and encrypted; a file becomes public only when an approved published media revision references its exact immutable id.
+- **Learned:** retaining only the newest media revision would break reproducible lesson pins, and accepting arbitrary HTTPS files conflicted with the same-origin content-security policy. The manifest now retains every published revision and delivery stays same-origin.
+- **Technical debt:** abandoned draft uploads need a scheduled orphan-cleanup job. Mongo/GridFS is appropriate for the current free curriculum and 100 MB asset limit, but high-volume or very large video should move behind a reviewed object-storage/CDN adapter later.
+- **Next:** Milestone 7 should use the complete authoring and media workflow to finish Foundations. Interactive Practice remains a separate backlog item and should be designed from real exercise requirements rather than interrupting curriculum work.
 
 ### Milestone 7 - Remaining Foundations Lessons
 
@@ -480,7 +491,8 @@ The existing `interactive_exercise` block remains suitable for simple learner-le
 - Academy history must remain a separate versioned contract. Milestone 4A establishes useful local history; Milestone 4B owns migration, retention, export, deletion, multi-device conflict handling, and explicit sync consent.
 - Existing production course records require the documented one-time version-index migration before a second course revision is saved.
 - Public media needs a storage/CDN strategy; do not put large course video into the existing encrypted-recording vault.
-- Media metadata governance is implemented, but binary upload/storage is intentionally pending a dedicated storage decision. Current assets use reviewed local or HTTPS sources.
+- Abandoned Academy draft uploads need a bounded cleanup job; public files cannot be deleted while a published immutable revision references them.
+- Academy GridFS delivery is capped at 100 MB per asset. Revisit an object-storage/CDN adapter before publishing large or high-traffic video libraries.
 - Lesson authoring must enforce captions, transcripts, evidence, and safety metadata, or content quality will drift.
 - Community features require funded human moderation and safeguarding; they are not a learner MVP dependency.
 - Native iOS work depends on later API-token and audio-provider boundaries described in the iOS readiness plan.
@@ -544,3 +556,4 @@ The existing `interactive_exercise` block remains suitable for simple learner-le
 - **2026-07-17:** Milestone 6 begins with a governed media library. Authors can save incomplete private drafts, but only real checksummed assets with complete rights and kind-specific accessibility metadata may enter role-separated review and publication. Published metadata is exposed through a cacheable read-only manifest; lesson resolution follows in the next focused slice.
 - **2026-07-17:** Governed lesson media uses an exact `{id, version, locale}` reference plus a bundled fallback source. The public manifest retains every published immutable revision, and the learner resolver uses only a kind-matched, fully reviewed exact revision; unavailable delivery never blanks a lesson.
 - **2026-07-17:** Staging published the real “How voice learning works” lesson and a one-lesson Foundations course through the author, reviewer, and publisher identities. The learner player consumed the pinned media revision and its governed alternative text on desktop and 390px mobile. HTML now uses `no-cache` so deployments discover hashed bundles while public manifests remain cacheable.
+- **2026-07-17:** Milestone 6 completed with separate private Academy GridFS storage, strict upload validation, draft-private file access, published immutable range delivery, checksum deduplication, and real pathway illustration v2/replacement plus Finnish localization validation. Remaining large-video/CDN and orphan-cleanup work is recorded as technical debt rather than hidden scope.

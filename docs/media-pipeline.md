@@ -35,7 +35,21 @@ The Admin Media Library provides structured fields for identity, source, checksu
 
 The HTML application shell is served with `no-cache` so a deployment immediately discovers the new hashed frontend bundle. This does not disable public API caching: content and media manifests retain their independent cache and stale-while-revalidate policies.
 
-Binary storage remains separate from metadata governance. Teaching files and caption tracks currently require same-origin paths, matching the app's restrictive content-security policy and avoiding third-party learner requests. External HTTPS URLs are accepted only as rights/source attribution. Educational media does not use the encrypted learner-recording vault. A later Milestone 6 slice must choose an upload/CDN strategy and an explicit origin policy before large production audio or video is accepted.
+Binary storage remains separate from metadata governance. Teaching files and caption tracks require same-origin paths, matching the app's restrictive content-security policy and avoiding third-party learner requests. External HTTPS URLs are accepted only as rights/source attribution. Educational media does not use the encrypted learner-recording vault.
+
+## File Storage And Delivery
+
+Academy authors can upload supported raster images, audio, video, WebVTT captions, and PDF resources through the Media Library. The backend streams each upload through a temporary spool, enforces a 100 MB limit, verifies a conservative MIME signature, computes SHA-256, and deduplicates matching content in a separate `academy_media_files` GridFS bucket.
+
+An uploaded file URL returns 404 until a published media revision references it as the teaching source or caption track. Public delivery then provides:
+
+- the reviewed MIME type and a safe filename;
+- a checksum ETag and conditional `304` responses;
+- one-year immutable caching because the file id never changes;
+- byte-range requests for audio/video seeking;
+- attachment delivery for PDFs and inline delivery for lesson media.
+
+The encrypted private-recording bucket is never reused. Abandoned draft uploads require a future cleanup job. GridFS is the current storage adapter, not a permanent mandate: an object-storage/CDN adapter should be reviewed before high-volume or larger video libraries are introduced.
 
 ## Lesson References
 

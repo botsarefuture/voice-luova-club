@@ -213,6 +213,12 @@ export async function listAcademyAdminMedia() {
   return response.json();
 }
 
+export async function uploadAcademyAdminMediaFile(file) {
+  const body = new FormData();
+  body.append("file", file);
+  return secureRequest("/api/admin/academy/media/files", { method: "POST", body });
+}
+
 export async function loadAcademyAdminMedia(id, version, locale) {
   const response = await fetch(`/api/admin/academy/media/${encodeURIComponent(id)}/${version}/${encodeURIComponent(locale)}`, { headers: { Accept: "application/json" } });
   if (!response.ok) throw new Error("Could not load this media revision.");
