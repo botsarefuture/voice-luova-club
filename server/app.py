@@ -20,6 +20,7 @@ from pymongo.errors import DuplicateKeyError, PyMongoError
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 from academy_history import normalize_academy_history
+from academy_content import validate_lesson_document, validate_review
 from reminder_logic import VALID_REMINDER_TONES, normalize_reminder_days
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -53,6 +54,10 @@ ADMIN_USERNAMES = frozenset(
     for username in os.environ.get("FEMMEVOICE_ADMIN_USERNAMES", "").split(",")
     if username.strip()
 )
+ACADEMY_ROLE_USERS = {
+    role: frozenset(username.strip().lower() for username in os.environ.get(f"FEMMEVOICE_ACADEMY_{role.upper()}_USERNAMES", "").split(",") if username.strip())
+    for role in ("author", "reviewer", "publisher")
+}
 login_attempts = {}
 feedback_attempts = {}
 
@@ -76,6 +81,7 @@ email_tokens_collection = db["email_tokens"]
 feedback_collection = db["feedback"]
 recordings_collection = db["private_recordings"]
 academy_history_collection = db["academy_history"]
+academy_lessons_collection = db["academy_lessons"]
 recordings_bucket = GridFSBucket(db, bucket_name="private_recordings")
 progress_collection.create_index([("device_id", ASCENDING)])
 progress_collection.create_index([("storage_key", ASCENDING)], unique=True)
@@ -85,6 +91,8 @@ email_tokens_collection.create_index([("expires_at", ASCENDING)], expireAfterSec
 feedback_collection.create_index([("created_at", ASCENDING)], expireAfterSeconds=60 * 60 * 24 * 365)
 recordings_collection.create_index([("user_id", ASCENDING), ("recording_id", ASCENDING)], unique=True)
 academy_history_collection.create_index([("user_id", ASCENDING)], unique=True)
+academy_lessons_collection.create_index([("lesson_id", ASCENDING), ("version", ASCENDING)], unique=True)
+academy_lessons_collection.create_index([("status", ASCENDING), ("updated_at", ASCENDING)])
 
 
 @app.after_request
@@ -206,6 +214,7 @@ def user_from_request():
     if not user:
         session.clear()
         return None
+    roles = academy_roles_for(user["username_normalized"])
     return {
         "key": f"account:{user['_id']}",
         "id": str(user["_id"]),
@@ -214,12 +223,26 @@ def user_from_request():
         "email": user.get("email"),
         "email_verified": bool(user.get("email_verified_at")),
         "is_admin": user.get("username_normalized") in ADMIN_USERNAMES,
+        "academy_roles": sorted(roles),
     }
 
 
 def admin_from_request():
     user = user_from_request()
     if not user or not user["is_admin"]:
+        return None
+    return user
+
+
+def academy_roles_for(username):
+    if username in ADMIN_USERNAMES:
+        return {"author", "reviewer", "publisher", "admin"}
+    return {role for role, users in ACADEMY_ROLE_USERS.items() if username in users}
+
+
+def academy_user_with_role(role):
+    user = user_from_request()
+    if not user or role not in user["academy_roles"]:
         return None
     return user
 
@@ -514,6 +537,96 @@ def delete_personal_data():
     response = jsonify({"ok": True})
     response.headers["Clear-Site-Data"] = '"cache", "storage"'
     return response
+
+
+@app.get("/api/admin/academy/lessons")
+def list_academy_lessons_for_admin():
+    user = user_from_request()
+    if not user or not user["academy_roles"]:
+        return auth_error("Academy authoring access is required.", 403)
+    records = list(academy_lessons_collection.find({}, {"lesson": 0}).sort("updated_at", -1).limit(500))
+    return jsonify({"roles": user["academy_roles"], "lessons": [{
+        "lesson_id": item["lesson_id"], "version": item["version"], "status": item["status"], "title": item.get("title"),
+        "slug": item.get("slug"), "locale": item.get("locale"), "updated_at": item.get("updated_at"), "review": item.get("review"),
+    } for item in records]})
+
+
+@app.get("/api/admin/academy/lessons/<lesson_id>/<int:version>")
+def get_academy_lesson_for_admin(lesson_id, version):
+    user = user_from_request()
+    if not user or not user["academy_roles"]:
+        return auth_error("Academy authoring access is required.", 403)
+    record = academy_lessons_collection.find_one({"lesson_id": lesson_id, "version": version}, {"_id": 0})
+    if not record:
+        return auth_error("Academy lesson revision was not found.", 404)
+    return jsonify({"lesson": record["lesson"], "status": record["status"], "review": record.get("review"), "change_note": record.get("change_note", "")})
+
+
+@app.put("/api/admin/academy/lessons/<lesson_id>/<int:version>")
+def save_academy_lesson_draft(lesson_id, version):
+    if not csrf_required():
+        return auth_error("Your session expired. Refresh and try again.", 403)
+    user = academy_user_with_role("author")
+    if not user:
+        return auth_error("Academy author access is required.", 403)
+    if request.content_length and request.content_length > 1_000_000:
+        return auth_error("Lesson draft is too large.", 413)
+    payload = request.get_json(silent=True) or {}
+    try:
+        lesson = validate_lesson_document(payload.get("lesson"))
+    except ValueError as error:
+        return auth_error(str(error))
+    if lesson["id"] != lesson_id or lesson["version"] != version:
+        return auth_error("Lesson path must match the lesson id and version.")
+    change_note = str(payload.get("change_note", "")).strip()
+    if len(change_note) > 4000:
+        return auth_error("Change note is too long.")
+    existing = academy_lessons_collection.find_one({"lesson_id": lesson_id, "version": version})
+    if existing and existing.get("status") == "published":
+        return auth_error("Published revisions are immutable. Create a new lesson version.", 409)
+    timestamp = now_iso()
+    academy_lessons_collection.update_one(
+        {"lesson_id": lesson_id, "version": version},
+        {"$set": {"lesson": lesson, "lesson_id": lesson_id, "version": version, "title": lesson["title"], "slug": lesson["slug"], "locale": lesson["locale"], "status": "draft", "change_note": change_note, "updated_at": timestamp, "authored_by": user["username"]}, "$setOnInsert": {"created_at": timestamp}},
+        upsert=True,
+    )
+    return jsonify({"ok": True, "status": "draft", "updated_at": timestamp})
+
+
+@app.put("/api/admin/academy/lessons/<lesson_id>/<int:version>/review")
+def review_academy_lesson(lesson_id, version):
+    if not csrf_required():
+        return auth_error("Your session expired. Refresh and try again.", 403)
+    user = academy_user_with_role("reviewer")
+    if not user:
+        return auth_error("Academy reviewer access is required.", 403)
+    record = academy_lessons_collection.find_one({"lesson_id": lesson_id, "version": version})
+    if not record:
+        return auth_error("Academy lesson revision was not found.", 404)
+    try:
+        review = validate_review((request.get_json(silent=True) or {}).get("review"))
+    except ValueError as error:
+        return auth_error(str(error))
+    review.update({"reviewed_by": user["username"], "reviewed_at": now_iso()})
+    status = "in_review" if review["decision"] == "approved" else "draft"
+    academy_lessons_collection.update_one({"_id": record["_id"]}, {"$set": {"status": status, "review": review, "updated_at": now_iso()}})
+    return jsonify({"ok": True, "status": status, "review": review})
+
+
+@app.put("/api/admin/academy/lessons/<lesson_id>/<int:version>/publish")
+def publish_academy_lesson(lesson_id, version):
+    if not csrf_required():
+        return auth_error("Your session expired. Refresh and try again.", 403)
+    user = academy_user_with_role("publisher")
+    if not user:
+        return auth_error("Academy publisher access is required.", 403)
+    record = academy_lessons_collection.find_one({"lesson_id": lesson_id, "version": version})
+    if not record:
+        return auth_error("Academy lesson revision was not found.", 404)
+    if record.get("review", {}).get("decision") != "approved" or record.get("status") != "in_review":
+        return auth_error("An approved content, research, and accessibility review is required before publishing.", 409)
+    academy_lessons_collection.update_one({"_id": record["_id"]}, {"$set": {"status": "published", "published_at": now_iso(), "published_by": user["username"], "updated_at": now_iso()}})
+    return jsonify({"ok": True, "status": "published"})
 
 
 @app.get("/api/account/academy-history-sync")

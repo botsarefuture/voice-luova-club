@@ -2,18 +2,18 @@
 
 **Status:** living implementation guide  
 **Last updated:** 17 July 2026  
-**Current development phase:** Milestone 4 - Learner Progress & History, in progress
+**Current development phase:** Milestone 5 - Admin Academy, in progress
 
 ## Active Development
 
 | Item | Current state |
 | --- | --- |
-| Current milestone | Milestone 4B - Opt-in sync and privacy lifecycle, in progress |
-| Current version | `v0.3.17` |
-| Current working branch | `feat/academy-history-sync` |
-| Active pull request(s) | [PR #6](https://github.com/botsarefuture/FemmeVoice/pull/6) - Academy integration review fixes; [PR #7](https://github.com/botsarefuture/FemmeVoice/pull/7) - Milestone 4A local learner history; [PR #8](https://github.com/botsarefuture/FemmeVoice/pull/8) - Milestone 4B opt-in sync. [PR #5](https://github.com/botsarefuture/FemmeVoice/pull/5) integrated the completed Academy stack into `main`. |
-| Base branch | Short stack: this branch temporarily targets PR #7 because it depends on the local history contract. Retarget dependent PRs to `main` after the preceding stack merges. |
-| Next planned milestone | Milestone 5 - Admin Academy |
+| Current milestone | Milestone 5B - Accessible admin workspace and content preview, ready for review |
+| Current version | `v0.3.19` |
+| Current working branch | `feat/admin-academy` |
+| Active pull request(s) | [PR #9](https://github.com/botsarefuture/FemmeVoice/pull/9) - Academy content governance and authoring workspace. PRs #6-#8 are integrated into `main`. |
+| Base branch | `main` is canonical. |
+| Next planned milestone | Milestone 5C - Course and block form editing |
 | Overall completion estimate | About 30% of the long-term Academy vision; the core engine is complete, while history, authoring, media, curriculum, and coaching remain substantial work. |
 
 ## Vision
@@ -41,6 +41,8 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 - `v0.3.15` - Academy learner-history PR readiness
 - `v0.3.16` - Academy history opt-in sync and privacy lifecycle
 - `v0.3.17` - Academy history sync PR readiness
+- `v0.3.18` - Academy authoring workspace
+- `v0.3.19` - Academy authoring PR readiness
 
 Update this list whenever a versioned change is pushed so milestones, pull requests, and releases remain easy to correlate.
 
@@ -219,7 +221,7 @@ The generic engine is complete and has been validated with real, production-qual
 
 ### Milestone 4 - Learner Progress & History
 
-**Status:** 🚧 In Progress
+**Status:** ✅ Completed
 **Goal:** Help learners understand, reflect on, and continue their own Academy learning without turning history into a compliance score.
 **Complexity:** High  
 **Dependencies:** Milestones 2-3
@@ -266,7 +268,7 @@ The generic engine is complete and has been validated with real, production-qual
 
 ### Milestone 5 - Admin Academy
 
-**Status:** ⏳ Planned
+**Status:** 🚧 In Progress
 **Goal:** Give authorized contributors a structured, reviewable way to create and publish Academy content.
 **Complexity:** High
 **Dependencies:** Milestones 2-4
@@ -276,6 +278,36 @@ The generic engine is complete and has been validated with real, production-qual
 - [ ] Citation, safety, accessibility, and translation metadata are first-class authoring requirements.
 - [ ] Distinct author, reviewer, publisher, and administrator permissions.
 - [ ] A clean editing workflow before any drag-and-drop builder.
+
+#### Milestone 5A - Content Governance API
+
+**Status:** ✅ Completed
+**Goal:** Establish the server-side permission, validation, revision, and publish contract before creating an editor.
+
+**Completed**
+- [x] Separate Academy content collection and immutable published revisions.
+- [x] Environment-configured author, reviewer, publisher, and administrator roles.
+- [x] Draft, review, and publish endpoints with CSRF/auth checks.
+- [x] Content, research, and accessibility checks required before publishing.
+
+#### Milestone 5B - Accessible Admin Workspace
+
+**Status:** 👀 Ready for Review
+**Goal:** Build a structured authoring and preview interface against the governance API, without a drag-and-drop builder.
+
+**Dependencies:** Milestone 5A
+
+**Delivered**
+- [x] Role-gated Academy authoring route in the existing admin area.
+- [x] Revision browser, draft loading/saving, validation feedback, and learner-player preview.
+- [x] Real Foundations welcome lesson available as the first draft seed, proving the editor against production-quality content.
+
+#### Milestone 5C - Course And Block Form Editing
+
+**Status:** ⏳ Planned
+**Goal:** Replace the initial structured-document surface with efficient course and block forms after real author feedback has validated the content contract.
+
+**Dependencies:** Milestone 5B
 
 ### Milestone 6 - Educational Media Pipeline
 
@@ -371,3 +403,5 @@ The generic engine is complete and has been validated with real, production-qual
 - **2026-07-17:** Post-integration review fixes address per-lesson resume persistence, renderer-specific schema validation, and corrective safety-quiz feedback before Milestone 4 resumes.
 - **2026-07-17:** Milestone 4A implemented local-only Academy learner history, optional reflections, local-day activity summaries, export, and deletion. It is intentionally stacked on PR #6 until the review fixes merge.
 - **2026-07-17:** Milestone 4B adds opt-in account sync through a separate collection and API. Sync preserves local-first use, merges explicitly bounded learner records, and deletes the account copy when disabled.
+- **2026-07-17:** PRs #6-#8 integrated the Academy review and learner-history stack into `main`. Milestone 5 now branches from the canonical base; 5A begins with a role-scoped content governance API before the admin workspace.
+- **2026-07-17:** Milestone 5B adds a role-gated revision workspace that seeds, validates, saves, and previews the real Foundations welcome lesson. Course and block forms are intentionally a follow-up usability slice, not a rushed drag-and-drop editor.
