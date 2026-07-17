@@ -20,7 +20,7 @@ from pymongo.errors import DuplicateKeyError, PyMongoError
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 from academy_history import normalize_academy_history
-from academy_content import build_public_catalogue, can_submit_for_review, review_result_status, validate_course_document, validate_lesson_document, validate_review
+from academy_content import build_public_catalogue, can_submit_for_review, resolve_published_lesson_refs, review_result_status, validate_course_document, validate_lesson_document, validate_review
 from reminder_logic import VALID_REMINDER_TONES, normalize_reminder_days
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -64,9 +64,10 @@ feedback_attempts = {}
 app = Flask(__name__, static_folder=str(DIST), static_url_path="")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+session_cookie_secure = os.environ.get("SESSION_COOKIE_SECURE", "true").strip().lower() not in {"0", "false", "no"}
 app.config.update(
     SESSION_COOKIE_NAME="femmevoice_session",
-    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_SECURE=session_cookie_secure,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     PERMANENT_SESSION_LIFETIME=timedelta(days=14),
@@ -94,7 +95,7 @@ recordings_collection.create_index([("user_id", ASCENDING), ("recording_id", ASC
 academy_history_collection.create_index([("user_id", ASCENDING)], unique=True)
 academy_lessons_collection.create_index([("lesson_id", ASCENDING), ("version", ASCENDING)], unique=True)
 academy_lessons_collection.create_index([("status", ASCENDING), ("updated_at", ASCENDING)])
-academy_courses_collection.create_index([("course_id", ASCENDING)], unique=True)
+academy_courses_collection.create_index([("course_id", ASCENDING), ("version", ASCENDING)], unique=True)
 
 
 @app.after_request
@@ -359,11 +360,11 @@ def register():
     except DuplicateKeyError:
         return auth_error("That username is unavailable.", 409)
     legacy_username = session.get("migration_username")
-    account_user = {"id": str(result.inserted_id), "username": username, "display_name": username, "is_admin": normalized in ADMIN_USERNAMES}
     session.clear()
     session["user_id"] = str(result.inserted_id)
     session.permanent = True
     csrf_token()
+    account_user = user_from_request()
     migrated = migrate_progress(legacy_username, f"account:{result.inserted_id}", account_user) if legacy_username else False
     return jsonify({"authenticated": True, "user": account_user, "migrated": migrated}), 201
 
@@ -386,7 +387,7 @@ def login():
     session.permanent = True
     csrf_token()
     users_collection.update_one({"_id": user["_id"]}, {"$set": {"last_login_at": now_iso()}})
-    return jsonify({"authenticated": True, "user": {"id": str(user["_id"]), "username": user["username"], "display_name": user.get("display_name") or user["username"], "is_admin": user["username_normalized"] in ADMIN_USERNAMES}})
+    return jsonify({"authenticated": True, "user": user_from_request()})
 
 
 @app.post("/api/auth/logout")
@@ -544,8 +545,8 @@ def delete_personal_data():
 @app.get("/api/academy/content")
 def public_academy_content():
     """Expose only complete, published course revisions to anonymous learners."""
-    lessons = list(academy_lessons_collection.find({"status": "published"}, {"_id": 0, "lesson": 1, "updated_at": 1}))
-    courses = list(academy_courses_collection.find({"status": "published"}, {"_id": 0, "course": 1, "updated_at": 1}).sort("updated_at", -1).limit(100))
+    lessons = list(academy_lessons_collection.find({"status": "published"}, {"_id": 0, "lesson": 1, "version": 1, "updated_at": 1}))
+    courses = list(academy_courses_collection.find({"status": "published"}, {"_id": 0, "course": 1, "version": 1, "published_lesson_refs": 1, "published_at": 1, "updated_at": 1}).sort("updated_at", -1).limit(100))
     response = jsonify(build_public_catalogue(courses, lessons))
     response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=300"
     return response
@@ -569,11 +570,15 @@ def list_academy_courses_for_admin():
     if not user or not user["academy_roles"]:
         return auth_error("Academy authoring access is required.", 403)
     records = list(academy_courses_collection.find({}, {"_id": 0}).sort("updated_at", -1).limit(100))
+    for record in records:
+        record["version"] = record.get("version", record.get("course", {}).get("version", 1))
+        if isinstance(record.get("course"), dict):
+            record["course"]["version"] = record["version"]
     return jsonify({"courses": records})
 
 
-@app.put("/api/admin/academy/courses/<course_id>")
-def save_academy_course_draft(course_id):
+@app.put("/api/admin/academy/courses/<course_id>/<int:version>")
+def save_academy_course_draft(course_id, version):
     if not csrf_required():
         return auth_error("Your session expired. Refresh and try again.", 403)
     user = academy_user_with_role("author")
@@ -583,21 +588,24 @@ def save_academy_course_draft(course_id):
         course = validate_course_document((request.get_json(silent=True) or {}).get("course"))
     except ValueError as error:
         return auth_error(str(error))
-    if course["id"] != course_id:
-        return auth_error("Course path must match the course id.")
-    existing = academy_courses_collection.find_one({"course_id": course_id})
+    if course["id"] != course_id or course["version"] != version:
+        return auth_error("Course path must match the course id and version.")
+    existing = academy_courses_collection.find_one({"course_id": course_id, "version": version})
     if existing and existing.get("status") == "published":
         return auth_error("Published courses are immutable. Create a new course revision before changing it.", 409)
     timestamp = now_iso()
-    academy_courses_collection.update_one({"course_id": course_id}, {"$set": {"course_id": course_id, "course": course, "status": "draft", "updated_at": timestamp, "authored_by": user["username"]}, "$setOnInsert": {"created_at": timestamp}}, upsert=True)
+    try:
+        academy_courses_collection.update_one({"course_id": course_id, "version": version}, {"$set": {"course_id": course_id, "version": version, "course": course, "status": "draft", "updated_at": timestamp, "authored_by": user["username"]}, "$setOnInsert": {"created_at": timestamp}}, upsert=True)
+    except DuplicateKeyError:
+        return auth_error("Course revision storage needs the documented version-index migration before another version can be saved.", 409)
     return jsonify({"ok": True, "status": "draft", "updated_at": timestamp})
 
 
-@app.put("/api/admin/academy/courses/<course_id>/submit-review")
-def submit_academy_course_for_review(course_id):
+@app.put("/api/admin/academy/courses/<course_id>/<int:version>/submit-review")
+def submit_academy_course_for_review(course_id, version):
     if not csrf_required(): return auth_error("Your session expired. Refresh and try again.", 403)
     user = academy_user_with_role("author")
-    record = academy_courses_collection.find_one({"course_id": course_id})
+    record = academy_courses_collection.find_one({"course_id": course_id, "version": version})
     if not user: return auth_error("Academy author access is required.", 403)
     if not record: return auth_error("Save the course draft before requesting review.", 404)
     if not can_submit_for_review(record.get("status")): return auth_error("Only a draft course can be submitted for review.", 409)
@@ -605,11 +613,11 @@ def submit_academy_course_for_review(course_id):
     return jsonify({"ok": True, "status": "review_requested"})
 
 
-@app.put("/api/admin/academy/courses/<course_id>/review")
-def review_academy_course(course_id):
+@app.put("/api/admin/academy/courses/<course_id>/<int:version>/review")
+def review_academy_course(course_id, version):
     if not csrf_required(): return auth_error("Your session expired. Refresh and try again.", 403)
     user = academy_user_with_role("reviewer")
-    record = academy_courses_collection.find_one({"course_id": course_id})
+    record = academy_courses_collection.find_one({"course_id": course_id, "version": version})
     if not user: return auth_error("Academy reviewer access is required.", 403)
     if not record: return auth_error("Academy course was not found.", 404)
     if record.get("status") != "review_requested": return auth_error("An author must submit this course for review first.", 409)
@@ -621,15 +629,19 @@ def review_academy_course(course_id):
     return jsonify({"ok": True, "status": status, "review": review})
 
 
-@app.put("/api/admin/academy/courses/<course_id>/publish")
-def publish_academy_course(course_id):
+@app.put("/api/admin/academy/courses/<course_id>/<int:version>/publish")
+def publish_academy_course(course_id, version):
     if not csrf_required(): return auth_error("Your session expired. Refresh and try again.", 403)
     user = academy_user_with_role("publisher")
-    record = academy_courses_collection.find_one({"course_id": course_id})
+    record = academy_courses_collection.find_one({"course_id": course_id, "version": version})
     if not user: return auth_error("Academy publisher access is required.", 403)
     if not record: return auth_error("Academy course was not found.", 404)
     if record.get("status") != "in_review" or record.get("review", {}).get("decision") != "approved": return auth_error("An approved course review is required before publishing.", 409)
-    academy_courses_collection.update_one({"_id": record["_id"]}, {"$set": {"status": "published", "published_at": now_iso(), "published_by": user["username"], "updated_at": now_iso()}})
+    try:
+        lesson_refs = resolve_published_lesson_refs(record["course"], academy_lessons_collection.find({"status": "published"}, {"_id": 0, "lesson": 1, "version": 1}))
+    except ValueError as error:
+        return auth_error(str(error), 409)
+    academy_courses_collection.update_one({"_id": record["_id"]}, {"$set": {"status": "published", "published_lesson_refs": lesson_refs, "published_at": now_iso(), "published_by": user["username"], "updated_at": now_iso()}})
     return jsonify({"ok": True, "status": "published"})
 
 

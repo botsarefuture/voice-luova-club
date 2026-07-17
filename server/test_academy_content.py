@@ -1,6 +1,6 @@
 import unittest
 
-from academy_content import build_public_catalogue, can_submit_for_review, review_result_status, validate_course_document, validate_lesson_document, validate_review
+from academy_content import build_public_catalogue, can_submit_for_review, resolve_published_lesson_refs, review_result_status, validate_course_document, validate_lesson_document, validate_review
 
 
 def lesson():
@@ -33,9 +33,39 @@ class AcademyContentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_course_document(course)
 
+    def test_course_versions_default_legacy_content_to_version_one(self):
+        course = {"id": "foundations", "slug": "foundations", "title": "Foundations", "summary": "A calm start.", "locale": "en", "estimatedMinutes": 60, "lessonIds": ["welcome"]}
+        self.assertEqual(validate_course_document(course)["version"], 1)
+        course["version"] = 0
+        with self.assertRaises(ValueError):
+            validate_course_document(course)
+
     def test_public_catalogue_excludes_courses_with_unpublished_lesson_gaps(self):
         course = {"course": {"slug": "foundations", "lessonIds": ["welcome", "safety"]}, "published_at": "2026-07-17T00:00:00Z"}
         lessons = [{"lesson": {"slug": "welcome", "title": "Welcome"}}]
         self.assertEqual(build_public_catalogue([course], lessons)["courses"], [])
         lessons.append({"lesson": {"slug": "safety", "title": "Safety"}})
         self.assertEqual(build_public_catalogue([course], lessons)["courses"][0]["lessons"][1]["title"], "Safety")
+
+    def test_published_course_pins_exact_lesson_revisions(self):
+        course = {"id": "foundations", "slug": "foundations", "version": 2, "lessonIds": ["welcome"]}
+        lessons = [
+            {"lesson": {"id": "welcome", "slug": "welcome", "title": "Welcome v1", "version": 1}},
+            {"lesson": {"id": "welcome", "slug": "welcome", "title": "Welcome v2", "version": 2}},
+        ]
+        references = resolve_published_lesson_refs(course, lessons)
+        self.assertEqual(references, [{"slug": "welcome", "version": 2}])
+        record = {"course": course, "version": 2, "published_lesson_refs": references}
+        self.assertEqual(build_public_catalogue([record], lessons)["courses"][0]["lessons"][0]["title"], "Welcome v2")
+        lessons.append({"lesson": {"id": "welcome", "slug": "welcome", "title": "Welcome v3", "version": 3}})
+        self.assertEqual(build_public_catalogue([record], lessons)["courses"][0]["lessons"][0]["title"], "Welcome v2")
+
+    def test_public_catalogue_uses_only_latest_published_course_revision(self):
+        lesson_records = [{"lesson": {"slug": "welcome", "title": "Welcome", "version": 1}}]
+        courses = [
+            {"course": {"slug": "foundations", "version": 1, "lessonIds": ["welcome"]}, "version": 1},
+            {"course": {"slug": "foundations", "version": 2, "title": "Updated", "lessonIds": ["welcome"]}, "version": 2},
+        ]
+        catalogue = build_public_catalogue(courses, lesson_records)
+        self.assertEqual(len(catalogue["courses"]), 1)
+        self.assertEqual(catalogue["courses"][0]["course"]["title"], "Updated")
