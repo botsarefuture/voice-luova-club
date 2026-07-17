@@ -3,10 +3,16 @@ import test from "node:test";
 import { ACADEMY_CATALOG_VERSION, ACADEMY_COURSES, formatCourseDuration, getAcademyCourse } from "../src/academy/catalog.js";
 import { academyRoute, parseAppRoute } from "../src/academy/routes.js";
 
-test("academy routes retain a course slug without affecting other views", () => {
-  assert.deepEqual(parseAppRoute("#academy/foundations"), { view: "academy", academyCourseSlug: "foundations" });
-  assert.deepEqual(parseAppRoute("#practice"), { view: "practice", academyCourseSlug: null });
+test("academy routes retain nested content slugs without affecting other views", () => {
+  assert.deepEqual(parseAppRoute("#academy/foundations/your-voice-your-goals"), {
+    view: "academy",
+    academyCourseSlug: "foundations",
+    academyLessonSlug: "your-voice-your-goals",
+  });
+  assert.deepEqual(parseAppRoute("#practice"), { view: "practice", academyCourseSlug: null, academyLessonSlug: null });
   assert.equal(academyRoute("foundations"), "academy/foundations");
+  assert.equal(academyRoute("foundations", "your voice"), "academy/foundations/your%20voice");
+  assert.equal(parseAppRoute("#academy/foundations/your%20voice").academyLessonSlug, "your voice");
 });
 
 test("academy catalogue exposes a versioned Foundations course", () => {

@@ -87,6 +87,7 @@ function initialRoute() {
   return {
     view: APP_VIEWS.some((item) => item.id === route.view) ? route.view : "today",
     academyCourseSlug: route.view === "academy" ? route.academyCourseSlug : null,
+    academyLessonSlug: route.view === "academy" ? route.academyLessonSlug : null,
   };
 }
 
@@ -364,6 +365,7 @@ const RESEARCH_GUIDE = [
 export default function App() {
   const [activeView, setActiveView] = useState(() => initialRoute().view);
   const [academyCourseSlug, setAcademyCourseSlug] = useState(() => initialRoute().academyCourseSlug);
+  const [academyLessonSlug, setAcademyLessonSlug] = useState(() => initialRoute().academyLessonSlug);
   const [deviceId] = useState(getDeviceId);
   const [listening, setListening] = useState(false);
   const [micError, setMicError] = useState("");
@@ -525,6 +527,7 @@ export default function App() {
       const route = initialRoute();
       setActiveView(route.view);
       setAcademyCourseSlug(route.academyCourseSlug);
+      setAcademyLessonSlug(route.academyLessonSlug);
     };
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
@@ -1089,13 +1092,15 @@ export default function App() {
     window.location.hash = view;
     setActiveView(view);
     setAcademyCourseSlug(null);
+    setAcademyLessonSlug(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function navigateToAcademy(courseSlug = null) {
-    window.location.hash = academyRoute(courseSlug);
+  function navigateToAcademy(courseSlug = null, lessonSlug = null) {
+    window.location.hash = academyRoute(courseSlug, lessonSlug);
     setActiveView("academy");
     setAcademyCourseSlug(courseSlug);
+    setAcademyLessonSlug(lessonSlug);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -1940,6 +1945,7 @@ export default function App() {
 
       {activeView === "academy" && <AcademyView
         courseSlug={academyCourseSlug}
+        lessonSlug={academyLessonSlug}
         onOpenCourse={navigateToAcademy}
         onBack={() => navigateToAcademy()}
       />}
