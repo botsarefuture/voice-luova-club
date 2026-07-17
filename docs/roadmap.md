@@ -8,12 +8,12 @@
 
 | Item | Current state |
 | --- | --- |
-| Current milestone | Milestone 5B - Accessible admin workspace and content preview, ready for review |
-| Current version | `v0.3.19` |
-| Current working branch | `feat/admin-academy` |
-| Active pull request(s) | [PR #9](https://github.com/botsarefuture/FemmeVoice/pull/9) - Academy content governance and authoring workspace. PRs #6-#8 are integrated into `main`. |
+| Current milestone | Milestone 5C - Block authoring controls, ready for review |
+| Current version | `v0.3.20` |
+| Current working branch | `feat/academy-course-block-editor` |
+| Active pull request(s) | Block-authoring PR pending. PR #9 is integrated into `main`. |
 | Base branch | `main` is canonical. |
-| Next planned milestone | Milestone 5C - Course and block form editing |
+| Next planned milestone | Milestone 5D - Course editor and ordering |
 | Overall completion estimate | About 30% of the long-term Academy vision; the core engine is complete, while history, authoring, media, curriculum, and coaching remain substantial work. |
 
 ## Vision
@@ -43,6 +43,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 - `v0.3.17` - Academy history sync PR readiness
 - `v0.3.18` - Academy authoring workspace
 - `v0.3.19` - Academy authoring PR readiness
+- `v0.3.20` - Academy block authoring controls
 
 Update this list whenever a versioned change is pushed so milestones, pull requests, and releases remain easy to correlate.
 
@@ -302,12 +303,24 @@ The generic engine is complete and has been validated with real, production-qual
 - [x] Revision browser, draft loading/saving, validation feedback, and learner-player preview.
 - [x] Real Foundations welcome lesson available as the first draft seed, proving the editor against production-quality content.
 
-#### Milestone 5C - Course And Block Form Editing
+#### Milestone 5C - Block Authoring Controls
 
-**Status:** ⏳ Planned
-**Goal:** Replace the initial structured-document surface with efficient course and block forms after real author feedback has validated the content contract.
+**Status:** 👀 Ready for Review
+**Goal:** Add safe, keyboard-friendly block creation and ordering around the real lesson document without creating a second editor schema.
 
 **Dependencies:** Milestone 5B
+
+**Delivered**
+- [x] Add a supported block type with safe starter content and required accessibility placeholders.
+- [x] Remove a block or move it earlier/later without drag-and-drop.
+- [x] Keep the document validator and learner preview as the final authoring boundary.
+
+#### Milestone 5D - Course Editor And Ordering
+
+**Status:** ⏳ Planned
+**Goal:** Add course metadata and lesson ordering after block controls have been proven against real Foundations content.
+
+**Dependencies:** Milestone 5C
 
 ### Milestone 6 - Educational Media Pipeline
 
@@ -405,3 +418,4 @@ The generic engine is complete and has been validated with real, production-qual
 - **2026-07-17:** Milestone 4B adds opt-in account sync through a separate collection and API. Sync preserves local-first use, merges explicitly bounded learner records, and deletes the account copy when disabled.
 - **2026-07-17:** PRs #6-#8 integrated the Academy review and learner-history stack into `main`. Milestone 5 now branches from the canonical base; 5A begins with a role-scoped content governance API before the admin workspace.
 - **2026-07-17:** Milestone 5B adds a role-gated revision workspace that seeds, validates, saves, and previews the real Foundations welcome lesson. Course and block forms are intentionally a follow-up usability slice, not a rushed drag-and-drop editor.
+- **2026-07-17:** Milestone 5C adds small block controls directly around the real Foundations lesson document. This keeps block ordering accessible and schema-backed, while course editing remains a separate focused PR.
