@@ -53,6 +53,18 @@ def review_result_status(decision):
     return "in_review" if decision == "approved" else "draft"
 
 
+def build_public_catalogue(course_records, lesson_records):
+    lessons_by_slug = {item["lesson"]["slug"]: item["lesson"] for item in lesson_records if item.get("lesson", {}).get("slug")}
+    courses = []
+    for record in course_records:
+        course = record.get("course") or {}
+        ordered_lessons = [lessons_by_slug.get(slug) for slug in course.get("lessonIds", [])]
+        if not ordered_lessons or any(item is None for item in ordered_lessons):
+            continue
+        courses.append({"course": course, "lessons": ordered_lessons, "publishedAt": record.get("published_at")})
+    return {"schemaVersion": 1, "courses": courses}
+
+
 def validate_course_document(course):
     if not isinstance(course, dict):
         raise ValueError("Course must be an object.")

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronDown, ChevronUp, Eye, FilePlus2, Save, Send, ShieldCheck, Stamp, Trash2 } from "lucide-react";
-import { listAcademyAdminCourses, listAcademyAdminLessons, loadAcademyAdminLesson, publishAcademyAdminLesson, reviewAcademyAdminLesson, saveAcademyAdminCourse, saveAcademyAdminLesson, submitAcademyAdminLessonForReview } from "../api";
+import { listAcademyAdminCourses, listAcademyAdminLessons, loadAcademyAdminLesson, publishAcademyAdminCourse, publishAcademyAdminLesson, reviewAcademyAdminCourse, reviewAcademyAdminLesson, saveAcademyAdminCourse, saveAcademyAdminLesson, submitAcademyAdminCourseForReview, submitAcademyAdminLessonForReview } from "../api";
 import { ACADEMY_COURSES } from "./catalog";
 import { FOUNDATIONS_LESSONS } from "./content/foundations";
 import LessonPlayer from "./LessonPlayer";
@@ -14,6 +14,8 @@ export default function AdminAcademy({ roles }) {
   const [courses, setCourses] = useState([]);
   const [lesson, setLesson] = useState(null);
   const [course, setCourse] = useState(null);
+  const [courseStatus, setCourseStatus] = useState("draft");
+  const [courseReview, setCourseReview] = useState({ decision: "approved", content_checked: false, research_checked: false, accessibility_checked: false, note: "" });
   const [comparison, setComparison] = useState(null);
   const [lessonStatus, setLessonStatus] = useState("draft");
   const [review, setReview] = useState({ decision: "approved", content_checked: false, research_checked: false, accessibility_checked: false, note: "" });
@@ -125,10 +127,12 @@ export default function AdminAcademy({ roles }) {
       tags: ["foundations", "transfeminine"],
       prerequisiteCourseIds: [],
     }, "Foundations course loaded with its current lesson order.");
+    setCourseStatus("draft"); setCourseReview({ decision: "approved", content_checked: false, research_checked: false, accessibility_checked: false, note: "" });
   }
 
   function openCourse(record) {
     setCourseDraft(structuredClone(record.course), `Editing ${record.course.title}.`);
+    setCourseStatus(record.status ?? "draft"); setCourseReview(record.review ?? { decision: "approved", content_checked: false, research_checked: false, accessibility_checked: false, note: "" });
   }
 
   function updateCourse(mutator) {
@@ -143,8 +147,17 @@ export default function AdminAcademy({ roles }) {
     try {
       setStatus("Saving course draft...");
       await saveAcademyAdminCourse(course.id, course);
+      setCourseStatus("draft");
       setStatus("Course draft saved with its lesson order.");
       refresh();
+    } catch (error) { setStatus(error.message); }
+  }
+
+  async function courseTransition(action) {
+    if (!course) return;
+    try {
+      const result = action === "submit" ? await submitAcademyAdminCourseForReview(course.id) : action === "review" ? await reviewAcademyAdminCourse(course.id, courseReview) : await publishAcademyAdminCourse(course.id);
+      setCourseStatus(result.status); if (result.review) setCourseReview(result.review); setStatus(action === "publish" ? "Course published. Learners can receive it only with its complete published lesson path." : "Course workflow updated."); refresh();
     } catch (error) { setStatus(error.message); }
   }
 
@@ -191,7 +204,7 @@ export default function AdminAcademy({ roles }) {
         {status && <p className="privacy-status" role="status">{status}</p>}
       </div>
     </div>
-    <CourseEditor course={course} records={records} courses={courses} onStart={startFoundationsCourse} onOpen={openCourse} onChange={updateCourse} onSave={saveCourse} canAuthor={roles.includes("author")} />
+    <CourseEditor course={course} records={records} courses={courses} onStart={startFoundationsCourse} onOpen={openCourse} onChange={updateCourse} onSave={saveCourse} canAuthor={roles.includes("author")} status={courseStatus} review={courseReview} onReviewChange={setCourseReview} roles={roles} onTransition={courseTransition} />
   </section>;
 }
 
@@ -233,15 +246,17 @@ function RevisionDiff({ current, previous, changeNote }) {
   return <div className="admin-revision-diff"><h4>Compared with v{previous.version}</h4>{changeNote && <p><strong>Saved change note:</strong> {changeNote}</p>}{changes.length ? <dl>{changes.map((change) => <div key={change.label}><dt>{change.label}</dt><dd><span>Before: {displayValue(change.before)}</span><span>Now: {displayValue(change.after)}</span></dd></div>)}</dl> : <p>No summary fields changed. Review individual block content before publishing.</p>}</div>;
 }
 
-function CourseEditor({ course, records, courses, onStart, onOpen, onChange, onSave, canAuthor }) {
+function CourseEditor({ course, records, courses, onStart, onOpen, onChange, onSave, canAuthor, status, review, onReviewChange, roles, onTransition }) {
   const availableLessons = uniqueLessons(records);
   const savedCourseRecords = courses.filter((record) => record.course);
   const update = (field, value) => onChange((next) => { next[field] = value; });
   const moveLesson = (index, direction) => onChange((next) => { const target = index + direction; if (target < 0 || target >= next.lessonIds.length) return; [next.lessonIds[index], next.lessonIds[target]] = [next.lessonIds[target], next.lessonIds[index]]; });
   const removeLesson = (index) => onChange((next) => { next.lessonIds.splice(index, 1); });
   const addLesson = (lessonId) => onChange((next) => { if (lessonId && !next.lessonIds.includes(lessonId)) next.lessonIds.push(lessonId); });
-  return <section className="admin-course-editor" aria-labelledby="admin-course-title"><div><p className="eyebrow">Course structure</p><h3 id="admin-course-title">Keep the learning path legible.</h3><p>Courses have an intentional order. Learners can pause, but authors should make the next useful step obvious.</p><button type="button" className="secondary-action" onClick={onStart}><FilePlus2 /> Load Foundations course</button>{savedCourseRecords.length > 0 && <div className="admin-saved-course-list"><strong>Saved drafts</strong>{savedCourseRecords.map((record) => <button type="button" key={record.course_id} onClick={() => onOpen(record)}>{record.course.title}<span>{record.status}</span></button>)}</div>}</div>{!course ? <div className="admin-course-empty"><p>Load the Foundations course to edit its metadata and order with structured controls.</p></div> : <div className="admin-course-form"><div className="admin-form-grid"><Field label="Course title" value={course.title} onChange={(value) => update("title", value)} required /><Field label="Slug" value={course.slug} onChange={(value) => update("slug", value)} required /><Field label="Course ID" value={course.id} onChange={(value) => update("id", value)} required /><Field label="Locale" value={course.locale} onChange={(value) => update("locale", value)} required /><Field label="Estimated minutes" value={course.estimatedMinutes} type="number" min="0" onChange={(value) => update("estimatedMinutes", numberOrZero(value))} required /><Field label="Tags" value={(course.tags ?? []).join(", ")} onChange={(value) => update("tags", commaList(value))} hint="Comma separated." /><Field label="Course summary" value={course.summary} onChange={(value) => update("summary", value)} multiline required /><Field label="Prerequisite course IDs" value={(course.prerequisiteCourseIds ?? []).join(", ")} onChange={(value) => update("prerequisiteCourseIds", commaList(value))} hint="Future-ready; not enforced for learners yet." /></div><section className="admin-course-lessons" aria-labelledby="course-lessons-title"><div className="admin-section-heading"><div><p className="eyebrow">Lesson order</p><h4 id="course-lessons-title">Build the route learners will follow.</h4></div><label className="inline-select">Add available lesson<select value="" onChange={(event) => { if (event.target.value) addLesson(event.target.value); }}><option value="">Choose a lesson...</option>{availableLessons.filter((item) => !course.lessonIds.includes(item.id)).map((item) => <option value={item.id} key={item.id}>{item.title}</option>)}</select></label></div>{course.lessonIds.length === 0 ? <p className="lesson-muted">Add at least one lesson to define this course.</p> : <ol className="admin-course-lesson-list">{course.lessonIds.map((lessonId, index) => { const item = availableLessons.find((candidate) => candidate.id === lessonId); return <li key={`${lessonId}-${index}`}><span><strong>{index + 1}. {item?.title ?? lessonId}</strong><small>{lessonId}</small></span><div><button type="button" className="icon-action" disabled={index === 0} onClick={() => moveLesson(index, -1)} aria-label={`Move ${item?.title ?? lessonId} earlier`}><ChevronUp /></button><button type="button" className="icon-action" disabled={index === course.lessonIds.length - 1} onClick={() => moveLesson(index, 1)} aria-label={`Move ${item?.title ?? lessonId} later`}><ChevronDown /></button><button type="button" className="icon-action danger-action" onClick={() => removeLesson(index)} aria-label={`Remove ${item?.title ?? lessonId} from this course`}><Trash2 /></button></div></li>; })}</ol>}</section><button type="button" className="primary-action" onClick={onSave} disabled={!canAuthor}><Save /> Save course draft</button></div>}</section>;
+  return <section className="admin-course-editor" aria-labelledby="admin-course-title"><div><p className="eyebrow">Course structure</p><h3 id="admin-course-title">Keep the learning path legible.</h3><p>Courses have an intentional order. Learners can pause, but authors should make the next useful step obvious.</p><button type="button" className="secondary-action" onClick={onStart}><FilePlus2 /> Load Foundations course</button>{savedCourseRecords.length > 0 && <div className="admin-saved-course-list"><strong>Saved drafts</strong>{savedCourseRecords.map((record) => <button type="button" key={record.course_id} onClick={() => onOpen(record)}>{record.course.title}<span>{record.status}</span></button>)}</div>}</div>{!course ? <div className="admin-course-empty"><p>Load the Foundations course to edit its metadata and order with structured controls.</p></div> : <div className="admin-course-form"><div className="admin-form-grid"><Field label="Course title" value={course.title} onChange={(value) => update("title", value)} required /><Field label="Slug" value={course.slug} onChange={(value) => update("slug", value)} required /><Field label="Course ID" value={course.id} onChange={(value) => update("id", value)} required /><Field label="Locale" value={course.locale} onChange={(value) => update("locale", value)} required /><Field label="Estimated minutes" value={course.estimatedMinutes} type="number" min="0" onChange={(value) => update("estimatedMinutes", numberOrZero(value))} required /><Field label="Tags" value={(course.tags ?? []).join(", ")} onChange={(value) => update("tags", commaList(value))} hint="Comma separated." /><Field label="Course summary" value={course.summary} onChange={(value) => update("summary", value)} multiline required /><Field label="Prerequisite course IDs" value={(course.prerequisiteCourseIds ?? []).join(", ")} onChange={(value) => update("prerequisiteCourseIds", commaList(value))} hint="Future-ready; not enforced for learners yet." /></div><section className="admin-course-lessons" aria-labelledby="course-lessons-title"><div className="admin-section-heading"><div><p className="eyebrow">Lesson order</p><h4 id="course-lessons-title">Build the route learners will follow.</h4></div><label className="inline-select">Add available lesson<select value="" onChange={(event) => { if (event.target.value) addLesson(event.target.value); }}><option value="">Choose a lesson...</option>{availableLessons.filter((item) => !course.lessonIds.includes(item.id)).map((item) => <option value={item.id} key={item.id}>{item.title}</option>)}</select></label></div>{course.lessonIds.length === 0 ? <p className="lesson-muted">Add at least one lesson to define this course.</p> : <ol className="admin-course-lesson-list">{course.lessonIds.map((lessonId, index) => { const item = availableLessons.find((candidate) => candidate.id === lessonId); return <li key={`${lessonId}-${index}`}><span><strong>{index + 1}. {item?.title ?? lessonId}</strong><small>{lessonId}</small></span><div><button type="button" className="icon-action" disabled={index === 0} onClick={() => moveLesson(index, -1)} aria-label={`Move ${item?.title ?? lessonId} earlier`}><ChevronUp /></button><button type="button" className="icon-action" disabled={index === course.lessonIds.length - 1} onClick={() => moveLesson(index, 1)} aria-label={`Move ${item?.title ?? lessonId} later`}><ChevronDown /></button><button type="button" className="icon-action danger-action" onClick={() => removeLesson(index)} aria-label={`Remove ${item?.title ?? lessonId} from this course`}><Trash2 /></button></div></li>; })}</ol>}</section><button type="button" className="primary-action" onClick={onSave} disabled={!canAuthor}><Save /> Save course draft</button><CourseWorkflow status={status} review={review} onReviewChange={onReviewChange} roles={roles} onTransition={onTransition} /></div>}</section>;
 }
+
+function CourseWorkflow({ status, review, onReviewChange, roles, onTransition }) { const ready = review.content_checked && review.research_checked && review.accessibility_checked; return <section className="admin-review-form"><strong>Course status: {formatContentStatus(status)}</strong>{status !== "published" && roles.includes("author") && <button type="button" className="secondary-action" onClick={() => onTransition("submit")}><Send /> Submit course for review</button>}{roles.includes("reviewer") && <><label><input type="checkbox" checked={review.content_checked} onChange={(event) => onReviewChange({ ...review, content_checked: event.target.checked })} /> Content checked</label><label><input type="checkbox" checked={review.research_checked} onChange={(event) => onReviewChange({ ...review, research_checked: event.target.checked })} /> Research checked</label><label><input type="checkbox" checked={review.accessibility_checked} onChange={(event) => onReviewChange({ ...review, accessibility_checked: event.target.checked })} /> Accessibility checked</label>{status === "review_requested" && <button type="button" className="primary-action" disabled={!ready} onClick={() => onTransition("review")}><ShieldCheck /> Approve course</button>}</>}{roles.includes("publisher") && status === "in_review" && review.decision === "approved" && <button type="button" className="primary-action" onClick={() => onTransition("publish")}><Stamp /> Publish course</button>}</section>; }
 
 function EvidenceEditor({ lesson, onChange }) {
   const updateEvidence = (index, field, value) => onChange((next) => { next.evidence[index][field] = value; });

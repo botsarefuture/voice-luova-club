@@ -1,12 +1,24 @@
+import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, Clock3, ShieldCheck } from "lucide-react";
-import { ACADEMY_COURSES, formatCourseDuration, getAcademyCourse } from "./catalog";
+import { formatCourseDuration } from "./catalog";
+import { loadPublicAcademyContent } from "../api";
 import LessonPlayer from "./LessonPlayer";
 import { getFoundationsLesson } from "./content/foundations";
 import AcademyHistory from "./AcademyHistory";
+import { normalizePublishedAcademyContent, staticAcademyContent } from "./publicContent";
 
 export default function AcademyView({ courseSlug, lessonSlug, onOpenCourse, onBack, history, historySyncEnabled, onLessonHistory, onDeleteHistory, onAddJournal }) {
-  const course = courseSlug ? getAcademyCourse(courseSlug) : null;
-  const lesson = courseSlug === "foundations" && lessonSlug ? getFoundationsLesson(lessonSlug) : null;
+  const [content, setContent] = useState(staticAcademyContent);
+  const course = courseSlug ? content.courses.find((item) => item.slug === courseSlug) ?? null : null;
+  const lesson = lessonSlug ? course?.lessonDocuments?.[lessonSlug] ?? course?.lessons.find((item) => item.slug === lessonSlug)?.document ?? (courseSlug === "foundations" ? getFoundationsLesson(lessonSlug) : null) : null;
+
+  useEffect(() => {
+    let active = true;
+    loadPublicAcademyContent().then((payload) => {
+      if (active) setContent(normalizePublishedAcademyContent(payload));
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   if (course && lesson) {
     return <LessonPlayer key={`${lesson.id}:${lesson.version}`} lesson={lesson} courseTitle={course.title} courseSlug={course.slug} onHistoryEvent={onLessonHistory} onExit={() => onOpenCourse(course.slug)} />;
@@ -47,7 +59,7 @@ export default function AcademyView({ courseSlug, lessonSlug, onOpenCourse, onBa
       </section>
 
       <section className="academy-catalogue" aria-label="Academy courses">
-        {ACADEMY_COURSES.map((item) => (
+        {content.courses.map((item) => (
           <article className={`academy-course academy-course-${item.status}`} key={item.slug}>
             <div className="academy-course-topline"><p className="eyebrow">{item.eyebrow}</p><span>{item.status === "available" ? "Ready" : "Planned"}</span></div>
             <h3>{item.title}</h3>

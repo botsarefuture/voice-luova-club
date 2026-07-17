@@ -26,6 +26,12 @@ async function secureRequest(url, options = {}) {
   return response.json();
 }
 
+export async function loadPublicAcademyContent() {
+  const response = await fetch("/api/academy/content", { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error("Published Academy content is unavailable.");
+  return response.json();
+}
+
 export async function loadCloudProgress(deviceId) {
   const response = await fetch(`/api/progress/${encodeURIComponent(deviceId)}`, {
     headers: { Accept: "application/json" },
@@ -190,6 +196,10 @@ export async function listAcademyAdminCourses() {
 export async function saveAcademyAdminCourse(id, course) {
   return secureRequest(`/api/admin/academy/courses/${encodeURIComponent(id)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ course }) });
 }
+
+export async function submitAcademyAdminCourseForReview(id) { return secureRequest(`/api/admin/academy/courses/${encodeURIComponent(id)}/submit-review`, { method: "PUT" }); }
+export async function reviewAcademyAdminCourse(id, review) { return secureRequest(`/api/admin/academy/courses/${encodeURIComponent(id)}/review`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ review }) }); }
+export async function publishAcademyAdminCourse(id) { return secureRequest(`/api/admin/academy/courses/${encodeURIComponent(id)}/publish`, { method: "PUT" }); }
 
 export async function listPrivateRecordings() {
   const response = await fetch("/api/recordings", { headers: { Accept: "application/json" } });

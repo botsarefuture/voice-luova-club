@@ -20,7 +20,7 @@ from pymongo.errors import DuplicateKeyError, PyMongoError
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 from academy_history import normalize_academy_history
-from academy_content import can_submit_for_review, review_result_status, validate_course_document, validate_lesson_document, validate_review
+from academy_content import build_public_catalogue, can_submit_for_review, review_result_status, validate_course_document, validate_lesson_document, validate_review
 from reminder_logic import VALID_REMINDER_TONES, normalize_reminder_days
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -112,7 +112,7 @@ def apply_security_headers(response):
     response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
     if request.is_secure:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    if request.path.startswith("/api/auth/") or request.path.startswith("/api/privacy/") or request.path.startswith("/api/recordings") or request.path.startswith("/api/admin/") or request.path.startswith("/api/academy/") or request.path.startswith("/api/account/academy-history"):
+    if request.path.startswith("/api/auth/") or request.path.startswith("/api/privacy/") or request.path.startswith("/api/recordings") or request.path.startswith("/api/admin/") or (request.path.startswith("/api/academy/") and request.path != "/api/academy/content") or request.path.startswith("/api/account/academy-history"):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -541,6 +541,16 @@ def delete_personal_data():
     return response
 
 
+@app.get("/api/academy/content")
+def public_academy_content():
+    """Expose only complete, published course revisions to anonymous learners."""
+    lessons = list(academy_lessons_collection.find({"status": "published"}, {"_id": 0, "lesson": 1, "updated_at": 1}))
+    courses = list(academy_courses_collection.find({"status": "published"}, {"_id": 0, "course": 1, "updated_at": 1}).sort("updated_at", -1).limit(100))
+    response = jsonify(build_public_catalogue(courses, lessons))
+    response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=300"
+    return response
+
+
 @app.get("/api/admin/academy/lessons")
 def list_academy_lessons_for_admin():
     user = user_from_request()
@@ -575,9 +585,52 @@ def save_academy_course_draft(course_id):
         return auth_error(str(error))
     if course["id"] != course_id:
         return auth_error("Course path must match the course id.")
+    existing = academy_courses_collection.find_one({"course_id": course_id})
+    if existing and existing.get("status") == "published":
+        return auth_error("Published courses are immutable. Create a new course revision before changing it.", 409)
     timestamp = now_iso()
     academy_courses_collection.update_one({"course_id": course_id}, {"$set": {"course_id": course_id, "course": course, "status": "draft", "updated_at": timestamp, "authored_by": user["username"]}, "$setOnInsert": {"created_at": timestamp}}, upsert=True)
     return jsonify({"ok": True, "status": "draft", "updated_at": timestamp})
+
+
+@app.put("/api/admin/academy/courses/<course_id>/submit-review")
+def submit_academy_course_for_review(course_id):
+    if not csrf_required(): return auth_error("Your session expired. Refresh and try again.", 403)
+    user = academy_user_with_role("author")
+    record = academy_courses_collection.find_one({"course_id": course_id})
+    if not user: return auth_error("Academy author access is required.", 403)
+    if not record: return auth_error("Save the course draft before requesting review.", 404)
+    if not can_submit_for_review(record.get("status")): return auth_error("Only a draft course can be submitted for review.", 409)
+    academy_courses_collection.update_one({"_id": record["_id"]}, {"$set": {"status": "review_requested", "review_requested_at": now_iso(), "review_requested_by": user["username"], "updated_at": now_iso()}})
+    return jsonify({"ok": True, "status": "review_requested"})
+
+
+@app.put("/api/admin/academy/courses/<course_id>/review")
+def review_academy_course(course_id):
+    if not csrf_required(): return auth_error("Your session expired. Refresh and try again.", 403)
+    user = academy_user_with_role("reviewer")
+    record = academy_courses_collection.find_one({"course_id": course_id})
+    if not user: return auth_error("Academy reviewer access is required.", 403)
+    if not record: return auth_error("Academy course was not found.", 404)
+    if record.get("status") != "review_requested": return auth_error("An author must submit this course for review first.", 409)
+    try: review = validate_review((request.get_json(silent=True) or {}).get("review"))
+    except ValueError as error: return auth_error(str(error))
+    review.update({"reviewed_by": user["username"], "reviewed_at": now_iso()})
+    status = review_result_status(review["decision"])
+    academy_courses_collection.update_one({"_id": record["_id"]}, {"$set": {"status": status, "review": review, "updated_at": now_iso()}})
+    return jsonify({"ok": True, "status": status, "review": review})
+
+
+@app.put("/api/admin/academy/courses/<course_id>/publish")
+def publish_academy_course(course_id):
+    if not csrf_required(): return auth_error("Your session expired. Refresh and try again.", 403)
+    user = academy_user_with_role("publisher")
+    record = academy_courses_collection.find_one({"course_id": course_id})
+    if not user: return auth_error("Academy publisher access is required.", 403)
+    if not record: return auth_error("Academy course was not found.", 404)
+    if record.get("status") != "in_review" or record.get("review", {}).get("decision") != "approved": return auth_error("An approved course review is required before publishing.", 409)
+    academy_courses_collection.update_one({"_id": record["_id"]}, {"$set": {"status": "published", "published_at": now_iso(), "published_by": user["username"], "updated_at": now_iso()}})
+    return jsonify({"ok": True, "status": "published"})
 
 
 @app.get("/api/admin/academy/lessons/<lesson_id>/<int:version>")

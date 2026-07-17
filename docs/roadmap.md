@@ -8,9 +8,9 @@
 
 | Item | Current state |
 | --- | --- |
-| Current milestone | Milestone 5H - Revision comparison and Foundations migration, in progress |
-| Current version | `v0.3.25` |
-| Current working branch | `feat/academy-revision-comparison` |
+| Current milestone | Milestone 5H - Governed content delivery and Foundations migration, in progress |
+| Current version | `v0.3.26` |
+| Current working branch | `feat/academy-content-delivery` |
 | Active pull request(s) | Revision-comparison PR in preparation. PR #14 is integrated into `main`. |
 | Base branch | `main` is canonical. |
 | Next planned milestone | Full Foundations migration through Admin Academy, then Milestone 5 review |
@@ -49,6 +49,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 - `v0.3.23` - Structured course authoring and ordering forms
 - `v0.3.24` - Academy review and publishing workflow
 - `v0.3.25` - Academy revision comparison
+- `v0.3.26` - Governed Academy content delivery
 
 Update this list whenever a versioned change is pushed so milestones, pull requests, and releases remain easy to correlate.
 
@@ -399,6 +400,7 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 **Remaining**
 - [ ] Use the complete draft/review/publish flow to migrate and maintain the full Foundations course.
 - [ ] Conduct the Milestone 5 practical authoring review against that real content.
+- [ ] Complete the live author, reviewer, and publisher approvals for Foundations; this is intentionally not bypassed by a deployment script.
 
 ### Milestone 6 - Educational Media Pipeline
 
@@ -502,3 +504,4 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 - **2026-07-17:** Milestone 5F replaces the remaining course JSON route with structured metadata and accessible ordering controls. The editor uses the existing course validation contract and starts from the real Foundations path.
 - **2026-07-17:** Milestone 5G adds a guarded author-submit, reviewer-check, publisher-release workflow. Server-side transitions reject skipped review and preserve published-revision immutability.
 - **2026-07-17:** Milestone 5H adds a readable revision-comparison view rather than relying on authors to infer changes from version numbers. The remaining proof is real Foundations migration through the completed workflow.
+- **2026-07-17:** The public Academy now prefers a cacheable, read-only published-content API. It excludes drafts, incomplete course paths, and unpublished lessons, and immediately falls back to bundled content when no complete published catalogue is available.
