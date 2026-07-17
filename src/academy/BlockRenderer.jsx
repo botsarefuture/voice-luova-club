@@ -110,7 +110,7 @@ function QuizBlock({ content, response, onResponse, disabled }) {
       <input type="radio" name="lesson-quiz" value={option.id} checked={response.selectedOptionId === option.id} disabled={disabled} onChange={() => onResponse({ selectedOptionId: option.id })} />
       <span>{option.label}</span>
     </label>
-  ))}{selected && <p className={selected.correct ? "lesson-answer-correct" : "lesson-answer-try-again"}><strong>{selected.correct ? "That is right." : "A useful moment to reconsider."}</strong> {content.explanation}</p>}</fieldset>;
+  ))}{selected && <p className={selected.correct ? "lesson-answer-correct" : "lesson-answer-try-again"}><strong>{selected.correct ? "That is right." : "That is not the safest next step."}</strong> {selected.correct ? content.explanation : content.incorrectExplanation ?? "Pause and choose the gentler, safer option instead."}</p>}</fieldset>;
 }
 
 function ActivityBlock({ icon: Icon, content, response, onResponse, disabled }) {

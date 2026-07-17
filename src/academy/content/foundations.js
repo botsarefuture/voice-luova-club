@@ -109,7 +109,8 @@ export const FOUNDATIONS_LESSONS = [
           { id: "push", label: "Push through until the exercise is complete", correct: false },
           { id: "record", label: "Record more samples to prove what happened", correct: false },
         ],
-        explanation: "Right. A lesson is never worth training through pain or worrying symptoms.",
+        explanation: "A lesson is never worth training through pain or worrying symptoms.",
+        incorrectExplanation: "Do not push through pain or record more samples to prove it. Pause, rest, and seek appropriate clinical support if symptoms persist.",
       }, ["voice-health"]),
       block("safety-reading", "reading", "Say it your way", "A short boundary to keep", 1, { kind: "activity" }, {
         passage: "I can stop, repeat, or choose an easier route. My voice does not have to earn a grade today.",

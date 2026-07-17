@@ -1,4 +1,5 @@
 const RESUME_KEY = "femmevoice:academy:lesson-resume";
+const RESUME_STORE_VERSION = 2;
 
 export function createLessonResumeStore(storage = globalThis.localStorage) {
   return {
@@ -12,12 +13,16 @@ export function createLessonResumeStore(storage = globalThis.localStorage) {
         ...state,
         updatedAt: new Date().toISOString(),
       }, lesson.blocks.length);
-      storage?.setItem(RESUME_KEY, JSON.stringify(resume));
+      const ledger = loadResumeLedger(storage);
+      ledger.lessons[lessonResumeKey(lesson)] = resume;
+      storage?.setItem(RESUME_KEY, JSON.stringify(ledger));
       return resume;
     },
     clear(lesson) {
-      const current = loadResume(storage, lesson);
-      if (current) storage?.removeItem(RESUME_KEY);
+      const ledger = loadResumeLedger(storage);
+      delete ledger.lessons[lessonResumeKey(lesson)];
+      if (Object.keys(ledger.lessons).length) storage?.setItem(RESUME_KEY, JSON.stringify(ledger));
+      else storage?.removeItem(RESUME_KEY);
     },
   };
 }
@@ -104,9 +109,32 @@ export function canCompleteBlock(block, response) {
 function loadResume(storage, lesson) {
   try {
     const saved = JSON.parse(storage?.getItem(RESUME_KEY) ?? "null");
-    if (saved?.lessonId !== lesson.id || saved?.lessonVersion !== lesson.version) return null;
-    return sanitizeResume(saved, lesson.blocks.length);
+    const stored = saved?.version === RESUME_STORE_VERSION ? saved.lessons?.[lessonResumeKey(lesson)] : saved;
+    if (stored?.lessonId !== lesson.id || stored?.lessonVersion !== lesson.version) return null;
+    return sanitizeResume(stored, lesson.blocks.length);
   } catch {
     return null;
   }
+}
+
+function loadResumeLedger(storage) {
+  try {
+    const saved = JSON.parse(storage?.getItem(RESUME_KEY) ?? "null");
+    if (saved?.version === RESUME_STORE_VERSION && saved.lessons && typeof saved.lessons === "object" && !Array.isArray(saved.lessons)) {
+      return { version: RESUME_STORE_VERSION, lessons: { ...saved.lessons } };
+    }
+    if (saved?.lessonId && saved?.lessonVersion) {
+      return {
+        version: RESUME_STORE_VERSION,
+        lessons: { [`${saved.lessonId}:${saved.lessonVersion}`]: saved },
+      };
+    }
+  } catch {
+    // A malformed local value should never prevent a person from resuming new lessons.
+  }
+  return { version: RESUME_STORE_VERSION, lessons: {} };
+}
+
+function lessonResumeKey(lesson) {
+  return `${lesson.id}:${lesson.version}`;
 }

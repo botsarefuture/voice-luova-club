@@ -84,6 +84,26 @@ test("schema rejects missing type-specific content before it creates a blank les
   assert.match(result.errors.join(" "), /content\.prompt/);
 });
 
+test("schema rejects malformed renderer content before a lesson can crash", () => {
+  const invalidRichText = structuredClone(LESSON_PLAYER_PREVIEW);
+  invalidRichText.blocks = [{
+    id: "broken-rich-text", type: "rich_text", version: 1, metadata: {}, durationMinutes: 1,
+    completion: { kind: "manual" }, accessibility: {}, safety: {}, evidenceRefs: [], content: { nodes: "not-an-array" },
+  }];
+  const richTextResult = validateLesson(invalidRichText);
+  assert.equal(richTextResult.valid, false);
+  assert.match(richTextResult.errors.join(" "), /structured rich-text nodes array/);
+
+  const invalidQuiz = structuredClone(LESSON_PLAYER_PREVIEW);
+  invalidQuiz.blocks = [{
+    id: "broken-quiz", type: "quiz", version: 1, metadata: {}, durationMinutes: 1,
+    completion: { kind: "quiz" }, accessibility: {}, safety: {}, evidenceRefs: [], content: { prompt: "Choose", options: {}, explanation: "Because" },
+  }];
+  const quizResult = validateLesson(invalidQuiz);
+  assert.equal(quizResult.valid, false);
+  assert.match(quizResult.errors.join(" "), /structured options array/);
+});
+
 test("completion requirements are participation-based rather than performance-scored", () => {
   assert.equal(canCompleteBlock({ completion: { kind: "manual" } }, {}), true);
   assert.equal(canCompleteBlock({ completion: { kind: "response", minLength: 3 } }, { text: "ok" }), false);
@@ -101,6 +121,36 @@ test("resume data is local, version-scoped, and never accepted for another lesso
   assert.deepEqual(store.load(lesson).completedBlockIds, ["one", "two"]);
   assert.equal(store.load(lesson).blockIndex, 2);
   assert.equal(store.load({ ...lesson, version: 3 }), null);
+});
+
+test("resume data keeps independent safe breakpoints for each lesson", () => {
+  const values = new Map();
+  const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: (key) => values.delete(key) };
+  const store = createLessonResumeStore(storage);
+  const first = { id: "lesson-one", version: 1, blocks: [{}, {}, {}] };
+  const second = { id: "lesson-two", version: 1, blocks: [{}, {}] };
+  store.save(first, { blockIndex: 2, completedBlockIds: ["one", "two"] });
+  store.save(second, { blockIndex: 1, completedBlockIds: ["a"] });
+
+  assert.equal(store.load(first).blockIndex, 2);
+  assert.equal(store.load(second).blockIndex, 1);
+  store.clear(first);
+  assert.equal(store.load(first), null);
+  assert.equal(store.load(second).blockIndex, 1);
+});
+
+test("saving a new lesson preserves a legacy single-lesson resume record", () => {
+  const legacy = { lessonId: "lesson-one", lessonVersion: 1, blockIndex: 1, completedBlockIds: ["one"] };
+  const values = new Map([["femmevoice:academy:lesson-resume", JSON.stringify(legacy)]]);
+  const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: (key) => values.delete(key) };
+  const store = createLessonResumeStore(storage);
+  const first = { id: "lesson-one", version: 1, blocks: [{}, {}] };
+  const second = { id: "lesson-two", version: 1, blocks: [{}, {}] };
+
+  store.save(second, { blockIndex: 1, completedBlockIds: ["two"] });
+
+  assert.equal(store.load(first).blockIndex, 1);
+  assert.equal(store.load(second).blockIndex, 1);
 });
 
 test("one lesson progress model keeps first, middle, last, and completion states coherent", () => {
@@ -159,6 +209,28 @@ test("every registered block has a renderable accessible player surface", async 
     assert.match(markup, new RegExp(`lesson-block-${type}`));
     assert.match(markup, /Preview block/);
   }
+});
+
+test("unsafe quiz choices receive corrective, not affirmative, feedback", async (t) => {
+  const vite = await createServer({ root: process.cwd(), logLevel: "silent", server: { middlewareMode: true } });
+  t.after(() => vite.close());
+  const { BlockRenderer } = await vite.ssrLoadModule("/src/academy/BlockRenderer.jsx");
+  const markup = renderToStaticMarkup(createElement(BlockRenderer, {
+    lesson: { evidence: [] },
+    block: {
+      ...previewBlock("quiz"),
+      content: {
+        prompt: "What should you do?",
+        options: [{ id: "safe", label: "Pause", correct: true }, { id: "unsafe", label: "Push through", correct: false }],
+        explanation: "Rest is the safer choice.",
+        incorrectExplanation: "Pause instead of practising through pain.",
+      },
+    },
+    response: { selectedOptionId: "unsafe" }, paused: false, onResponse: () => {},
+  }));
+  assert.match(markup, /That is not the safest next step/);
+  assert.match(markup, /Pause instead of practising through pain/);
+  assert.doesNotMatch(markup, /That is right/);
 });
 
 function previewBlock(type) {
