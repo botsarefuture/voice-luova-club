@@ -9,9 +9,9 @@
 | Item | Current state |
 | --- | --- |
 | Current milestone | Milestone 6 - Educational Media Pipeline |
-| Current version | `v0.3.31` |
+| Current version | `v0.3.32` |
 | Current working branch | `feat/academy-media-library` |
-| Active pull request(s) | Governed media-library PR in preparation; PR #19 is integrated into `main`. |
+| Active pull request(s) | PR #20 - Governed Academy media library; PR #19 is integrated into `main`. |
 | Base branch | `main` is canonical. |
 | Next planned milestone | Continue Milestone 6 with deterministic lesson asset references and public resolution. |
 | Overall completion estimate | About 40% of the long-term Academy vision; engine, history, governance, authoring, and delivery are complete, while media, remaining curriculum, and coaching remain substantial work. |
@@ -55,6 +55,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 - `v0.3.29` - Versioned educational media contract
 - `v0.3.30` - Blank Academy authoring and immutable course/lesson revision paths
 - `v0.3.31` - Governed Academy media library and publication workflow
+- `v0.3.32` - Governed media-library pull-request readiness
 
 Update this list whenever a versioned change is pushed so milestones, pull requests, and releases remain easy to correlate.
 
