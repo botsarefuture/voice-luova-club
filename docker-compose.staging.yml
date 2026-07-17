@@ -1,0 +1,21 @@
+services:
+  mongo:
+    image: mongo:8
+    volumes: [femmevoice-staging-mongo:/data/db]
+  app:
+    build: .
+    ports: ["127.0.0.1:5180:8080"]
+    environment:
+      FEMMEVOICE_ENV: staging
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: femmevoice_staging
+      LEGACY_MONGO_DB: femmevoice_legacy_staging
+      SECRET_KEY: femmevoice-local-staging-only-change-me
+      PUBLIC_BASE_URL: http://127.0.0.1:5180
+      FEMMEVOICE_ACADEMY_AUTHOR_USERNAMES: academy-author
+      FEMMEVOICE_ACADEMY_REVIEWER_USERNAMES: academy-reviewer
+      FEMMEVOICE_ACADEMY_PUBLISHER_USERNAMES: academy-publisher
+      FEMMEVOICE_ADMIN_USERNAMES: academy-admin
+    depends_on: [mongo]
+volumes:
+  femmevoice-staging-mongo:
