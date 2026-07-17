@@ -1,0 +1,9 @@
+# Governed Academy Content Delivery
+
+`GET /api/academy/content` is the learner-facing read-only catalogue. It is cacheable and returns only courses marked `published` whose ordered lesson path is complete and consists entirely of published lesson revisions. It never returns drafts, review requests, reviewer notes, or author identities.
+
+The React Academy renders bundled versioned content immediately, then replaces it only when this endpoint returns a complete compatible catalogue. This keeps local development, offline recovery, and a temporary content-store outage safe without making static source the primary path after publication.
+
+Courses and lessons follow the same author, reviewer, publisher separation. An author saves and submits a draft, a reviewer completes content, research, and accessibility checks, and a publisher releases the immutable record. A course cannot be publicly visible until every lesson it orders is published.
+
+The final Foundations migration must be performed through those identities in the Admin Academy. Automation must not silently mark educational content reviewed or published.

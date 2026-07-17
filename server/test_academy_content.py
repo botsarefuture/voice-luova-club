@@ -1,6 +1,6 @@
 import unittest
 
-from academy_content import can_submit_for_review, review_result_status, validate_course_document, validate_lesson_document, validate_review
+from academy_content import build_public_catalogue, can_submit_for_review, review_result_status, validate_course_document, validate_lesson_document, validate_review
 
 
 def lesson():
@@ -32,3 +32,10 @@ class AcademyContentTests(unittest.TestCase):
         course["lessonIds"].append("welcome")
         with self.assertRaises(ValueError):
             validate_course_document(course)
+
+    def test_public_catalogue_excludes_courses_with_unpublished_lesson_gaps(self):
+        course = {"course": {"slug": "foundations", "lessonIds": ["welcome", "safety"]}, "published_at": "2026-07-17T00:00:00Z"}
+        lessons = [{"lesson": {"slug": "welcome", "title": "Welcome"}}]
+        self.assertEqual(build_public_catalogue([course], lessons)["courses"], [])
+        lessons.append({"lesson": {"slug": "safety", "title": "Safety"}})
+        self.assertEqual(build_public_catalogue([course], lessons)["courses"][0]["lessons"][1]["title"], "Safety")

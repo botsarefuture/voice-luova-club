@@ -9,6 +9,17 @@ import { FOUNDATIONS_LESSONS, getFoundationsLesson } from "../src/academy/conten
 import { advanceLessonProgress, canCompleteBlock, createLessonProgress, createLessonResumeStore, moveLessonProgress } from "../src/academy/lessonProgress.js";
 import { addAcademyJournalEntry, clearAcademyHistory, createAcademyHistory, loadAcademyHistory, mergeAcademyHistories, recordLessonActivity, saveAcademyHistory, summarizeAcademyHistory } from "../src/academy/learnerHistory.js";
 import { LESSON_SCHEMA_VERSION, lessonDuration, validateLesson } from "../src/academy/schema.js";
+import { normalizePublishedAcademyContent, staticAcademyContent } from "../src/academy/publicContent.js";
+
+test("published Academy content replaces bundled content only when a complete catalogue is available", () => {
+  const fallback = staticAcademyContent();
+  assert.equal(normalizePublishedAcademyContent({ schemaVersion: 1, courses: [] }, fallback), fallback);
+  const lesson = structuredClone(FOUNDATIONS_LESSONS[0]);
+  const result = normalizePublishedAcademyContent({ schemaVersion: 1, courses: [{ course: { id: "foundations", slug: "foundations", title: "Published Foundations", summary: "Published", locale: "en", estimatedMinutes: 8, lessonIds: [lesson.slug] }, lessons: [lesson] }] }, fallback);
+  assert.equal(result.source, "published");
+  assert.equal(result.courses[0].title, "Published Foundations");
+  assert.equal(result.courses[0].lessonDocuments[lesson.slug].version, 1);
+});
 
 test("Admin Academy presents structured lesson and course authoring controls before JSON escape hatches", async () => {
   const vite = await createServer({ server: { middlewareMode: true }, appType: "custom" });
