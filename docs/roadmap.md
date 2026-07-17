@@ -2,7 +2,7 @@
 
 **Status:** living implementation guide  
 **Last updated:** 17 July 2026  
-**Current development phase:** Milestone 1 - Academy Foundation, ready for review
+**Current development phase:** Milestone 2 - Versioned Lesson Engine, ready for review
 
 ## Vision
 
@@ -14,7 +14,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 
 - Existing guided practice, local-first pitch analysis, encrypted opt-in recordings, account sync, reminders, progress history, research guide, and feedback inbox are live.
 - The existing app is a React/Vite single-page application with hash navigation. Flask/MongoDB provides accounts, progress sync, encrypted recording storage, reminders, and administrative feedback.
-- Academy catalogue routing and course-overview seed content are implemented. Academy learner progress and authoring are not yet implemented.
+- Academy catalogue routing, course-overview seed content, and a generic versioned lesson-player preview are implemented. Academy learner history/account sync and authoring are not yet implemented.
 
 ## Architecture Decisions
 
@@ -25,6 +25,9 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 | 2026-07-17 | Use transparent rules for coaching. | Recommendations must be explainable, user-controlled, and not gender-score or diagnose. |
 | 2026-07-17 | Keep recordings optional and encrypted. | Voice data is sensitive; academy participation must never require recording. |
 | 2026-07-17 | Deliver focused pull requests per milestone slice. | Preserve a working app and make review, rollback, and contribution manageable. |
+| 2026-07-17 | Use a schema-first lesson boundary with safe structured rich text. | Keep authored HTML out of the player and give future CMS revisions one validation contract. |
+| 2026-07-17 | Keep early Academy resume data in a separate, local, version-scoped key. | Prove safe-breakpoint behaviour without modifying legacy synced practice progress or collecting learner content. |
+| 2026-07-17 | Ship a clearly labelled engine preview, not Foundations course material. | Validate the player while preserving the planned curriculum review and publication process. |
 
 ## Milestones
 
@@ -43,7 +46,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 
 ### Milestone 1 - Academy Foundation
 
-**Status:** 👀 Ready for Review (100%)  
+**Status:** 👀 Ready for Review (100%)
 **Goal:** Make Academy a first-class, usable FemmeVoice destination without changing existing practice behaviour.  
 **Complexity:** Medium  
 **Dependencies:** Milestone 0
@@ -76,17 +79,29 @@ Create hash routes, a navigation entry, a static course catalogue, course/lesson
 
 ### Milestone 2 - Versioned Lesson Engine
 
-**Status:** ⏳ Planned  
+**Status:** 👀 Ready for Review (100%)
 **Goal:** Render reusable, versioned learning blocks safely and accessibly.  
 **Complexity:** High  
 **Dependencies:** Milestone 1
 
 **Acceptance criteria**
-- [ ] Text, audio, video, reflection, interactive exercise, reading, quiz, recording, checkpoint, and resource blocks have a common schema.
-- [ ] Each block supports evidence, safety, accessibility, and completion metadata.
-- [ ] Media has transcript/caption requirements and graceful error states.
-- [ ] Lesson state can resume at a safe block boundary.
-- [ ] The engine can power a non-voice course without a code change.
+- [x] Text, rich text, image, audio, video, reflection, interactive exercise, reading, quiz, conversation, recording, checkpoint, resource, and `Why this?` blocks have a common schema.
+- [x] Each block supports evidence, safety, accessibility, and completion metadata.
+- [x] Media has transcript/caption requirements and graceful error states.
+- [x] Lesson state can resume at a safe block boundary.
+- [x] The engine can power a non-voice course without a code change.
+
+**Completed**
+- [x] Added a versioned schema, block registry, validation, and safe rich-text structure.
+- [x] Added a responsive, keyboard-operable lesson player with pause, progress, completion rules, and a non-curriculum preview route.
+- [x] Added a local-only, version-scoped safe-breakpoint adapter that does not touch existing synced practice progress.
+- [x] Added a contributor architecture guide and schema/rendering/resume tests.
+
+**Known limitations**
+- The preview is intentionally not Foundations curriculum and has no voice-training exercise content.
+- Resume stores only a safe block index and completion ids on this device. It does not save reflections, quiz answers, recordings, or account-synced data.
+- The player exposes a recording block and no-recording route; a reusable encrypted recording-provider adapter is deferred until learner progress and content requirements are settled.
+- Translation links and revision lineage exist in the contract; authoring, translation workflow, and publishing enforcement are Milestone 6 work.
 
 ### Milestone 3 - Learner Progress
 
@@ -96,7 +111,7 @@ Create hash routes, a navigation entry, a static course catalogue, course/lesson
 **Dependencies:** Milestone 2
 
 **Acceptance criteria**
-- [ ] Local lesson completion, resume point, activity time, reflection, and private skill ledger.
+- [ ] Expand the M2 safe-breakpoint adapter into durable local lesson completion, activity time, reflection, and a private skill ledger.
 - [ ] Explicit account-sync behaviour with migration notes and tests.
 - [ ] Export/deletion covers academy data.
 - [ ] Existing `progress` version 1 remains readable and untouched.
@@ -144,6 +159,7 @@ Create hash routes, a navigation entry, a static course catalogue, course/lesson
 
 - `src/App.jsx` owns much of the current UI and practice orchestration. New academy code must stay outside it; extracting existing practice state requires dedicated tests before it moves.
 - Existing cloud sync stores a version-1 progress blob. Academy data needs separate collections and APIs rather than silently changing that contract.
+- The M2 preview uses local browser storage only. Milestone 3 must define migration, retention, export, deletion, multi-device conflict handling, and explicit sync consent before persisting richer academy state.
 - Public media needs a storage/CDN strategy; do not put large course video into the existing encrypted-recording vault.
 - Lesson authoring must enforce captions, transcripts, evidence, and safety metadata, or content quality will drift.
 - Community features require funded human moderation and safeguarding; they are not a learner MVP dependency.
@@ -160,3 +176,5 @@ Create hash routes, a navigation entry, a static course catalogue, course/lesson
 ## Change Log
 
 - **2026-07-17:** Roadmap created; Academy Foundation implemented and submitted for review. It adds hash routes, a versioned static catalogue, course-overview seed content, focused tests, and responsive UI. Learner progress is explicitly deferred to Milestone 3.
+- **2026-07-17:** Milestone 1 self-review extended Academy routes to `#academy/:courseSlug/:lessonSlug`, with defensive decoding. The change is included in its review PR.
+- **2026-07-17:** Milestone 2 implemented and submitted for review. It adds the generic versioned schema, registry, accessible lesson player, privacy-minimal safe-breakpoint preview state, developer architecture guide, and renderer/schema/resume tests. No Foundations curriculum, cloud sync, or authoring was added.
