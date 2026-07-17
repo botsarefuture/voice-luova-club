@@ -150,9 +150,6 @@ export const FOUNDATIONS_LESSONS = [
         instructions: "For ten quiet seconds, notice an ordinary sound around you or your own breathing. Then make one easy, everyday hum only if it feels comfortable. You are only noticing, not trying to place it anywhere.",
         actionLabel: "I noticed something",
       }, ["multidimensional-voice"]),
-      block("audio-placeholder", "audio", "Audio placeholder", "A future listening example", 1, { kind: "optional" }, {}, [], {
-        transcript: "Placeholder: a future audio pair will demonstrate two comfortably different speaking sounds without labelling either as better or more feminine.",
-      }),
       block("voice-map-why", "why_this", "Why this?", "Why not begin with a target note?", 1, { kind: "optional" }, {
         prompt: "Voice work includes more than a measured pitch, and a microphone cannot decide what is comfortable or affirming for you.",
       }, ["multidimensional-voice"]),

@@ -2,19 +2,19 @@
 
 **Status:** living implementation guide  
 **Last updated:** 17 July 2026  
-**Current development phase:** Milestone 5 - Admin Academy, in progress
+**Current development phase:** Milestone 5 - Admin Academy, completed
 
 ## Active Development
 
 | Item | Current state |
 | --- | --- |
-| Current milestone | Milestone 5H - Governed content delivery and Foundations migration, in progress |
-| Current version | `v0.3.27` |
+| Current milestone | Milestone 5 - Admin Academy, completed and ready to merge |
+| Current version | `v0.3.28` |
 | Current working branch | `feat/academy-pipeline-e2e` |
-| Active pull request(s) | Revision-comparison PR in preparation. PR #14 is integrated into `main`. |
+| Active pull request(s) | PR #17 - isolated Academy staging and end-to-end validation |
 | Base branch | `main` is canonical. |
-| Next planned milestone | Full Foundations migration through Admin Academy, then Milestone 5 review |
-| Overall completion estimate | About 30% of the long-term Academy vision; the core engine is complete, while history, authoring, media, curriculum, and coaching remain substantial work. |
+| Next planned milestone | Milestone 6 - Educational Media Pipeline |
+| Overall completion estimate | About 40% of the long-term Academy vision; engine, history, governance, authoring, and delivery are complete, while media, remaining curriculum, and coaching remain substantial work. |
 
 ## Vision
 
@@ -26,7 +26,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 
 - Existing guided practice, local-first pitch analysis, encrypted opt-in recordings, account sync, reminders, progress history, research guide, and feedback inbox are live.
 - The existing app is a React/Vite single-page application with hash navigation. Flask/MongoDB provides accounts, progress sync, encrypted recording storage, reminders, and administrative feedback.
-- Academy catalogue routing, the generic versioned lesson player, a production-quality four-lesson Foundations slice, learner history/account sync, and the initial governed Admin Academy are complete. Milestone 5 is replacing the remaining raw-document authoring paths with practical forms and workflows.
+- Academy catalogue routing, the generic lesson player, learner history/account sync, governed authoring, role-separated publishing, and published-content delivery are complete. The four production-quality Foundations lessons were migrated and rendered through the staging publication pipeline.
 
 ## Release History
 
@@ -51,6 +51,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 - `v0.3.25` - Academy revision comparison
 - `v0.3.26` - Governed Academy content delivery
 - `v0.3.27` - Local Academy staging workflow
+- `v0.3.28` - Milestone 5 end-to-end governance validation
 
 Update this list whenever a versioned change is pushed so milestones, pull requests, and releases remain easy to correlate.
 
@@ -277,17 +278,17 @@ The generic engine is complete and has been validated with real, production-qual
 
 ### Milestone 5 - Admin Academy
 
-**Status:** 🚧 In Progress
+**Status:** ✅ Completed
 **Goal:** Give authorized contributors a structured, reviewable way to create and publish Academy content.
 **Complexity:** High
 **Dependencies:** Milestones 2-4
 
 **Acceptance criteria**
-- [ ] A contributor can create, edit, order, preview, draft, review, publish, and browse revisions for courses and lessons without editing application code.
-- [ ] Every supported lesson block has a purpose-built, keyboard-accessible editing route; raw document editing is an escape hatch, not the normal workflow.
-- [ ] Accessibility metadata, evidence references, and future-ready translation links are first-class authoring requirements.
-- [ ] Distinct author, reviewer, publisher, and administrator permissions are enforced.
-- [ ] The complete Foundations course can be maintained through Admin Academy and serves as the practical validation target.
+- [x] A contributor can create, edit, order, preview, draft, review, publish, and browse revisions for courses and lessons without editing application code.
+- [x] Every supported lesson block has a purpose-built, keyboard-accessible editing route; raw document editing is an escape hatch, not the normal workflow.
+- [x] Accessibility metadata, evidence references, and future-ready translation links are first-class authoring requirements.
+- [x] Distinct author, reviewer, publisher, and administrator permissions are enforced.
+- [x] The current Foundations course can be maintained through Admin Academy and served through the governed public catalogue.
 
 **Definition of done**
 
@@ -342,7 +343,7 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 
 #### Milestone 5E - Structured Lesson Forms
 
-**Status:** 🚧 In Progress
+**Status:** ✅ Completed
 **Goal:** Make normal lesson authoring possible without editing raw JSON, using the real Foundations lessons as the fixture.
 
 **Dependencies:** Milestones 5A-5C
@@ -353,8 +354,7 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 - [x] Inline block reordering and a learner-player preview continue to use the canonical lesson schema.
 - [x] Raw structured documents are hidden behind an explicitly labelled advanced escape hatch.
 
-**Remaining**
-- [ ] Use the full workflow to migrate and maintain the complete Foundations curriculum.
+**Validated:** All four current Foundations lessons passed the staging author, reviewer, publisher, and learner flow.
 
 #### Milestone 5F - Structured Course Forms And Ordering
 
@@ -373,7 +373,7 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 
 #### Milestone 5G - Review And Publishing Workflow
 
-**Status:** 🚧 In Progress
+**Status:** ✅ Completed
 **Goal:** Make the governed content release path usable from Admin Academy, without weakening role separation or revision immutability.
 
 **Dependencies:** Milestone 5A and a saved lesson draft
@@ -384,12 +384,11 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 - [x] Publisher-only release action after an approved review; published revisions remain immutable.
 - [x] Centrally tested server-side workflow transitions rather than UI-only status handling.
 
-**Remaining**
-- [ ] Run the full course-and-lesson workflow against migrated Foundations content.
+**Validated:** Draft and reviewed content remained private; only published content entered the public catalogue.
 
 #### Milestone 5H - Revision Comparison And Foundations Migration
 
-**Status:** 🚧 In Progress
+**Status:** ✅ Completed
 **Goal:** Make authored changes reviewable in context, then prove the complete Admin Academy workflow with real Foundations content.
 
 **Dependencies:** Milestones 5E-5G
@@ -398,10 +397,15 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 - [x] Saved revision history, including state and last-updated context.
 - [x] Readable comparison of lesson title, objective, duration, safety note, flow ordering, evidence count, and author change note.
 
-**Remaining**
-- [ ] Use the complete draft/review/publish flow to migrate and maintain the full Foundations course.
-- [ ] Conduct the Milestone 5 practical authoring review against that real content.
-- [ ] Complete the live author, reviewer, and publisher approvals for Foundations; this is intentionally not bypassed by a deployment script.
+**Validated:** The isolated Compose stack published four Foundations lessons and one course through separate development identities, rendered four governed lessons on desktop and 390px mobile, and rebuilt reproducibly from a new Mongo volume.
+
+### Milestone 5 Retrospective
+
+- **Accomplished:** structured course and lesson authoring, immutable revisions, role-separated review/publishing, cacheable public delivery, bundled recovery content, and isolated contributor staging.
+- **Key decision:** the public catalogue includes a course only when the course and every ordered lesson are published; partial migrations remain invisible.
+- **Learned:** real content exposed a client/server media-validation mismatch that fixture-only tests missed. Publishing validation must exercise both schema boundaries.
+- **Technical debt:** course revisions currently use one immutable published record per course id; a future content-operations slice should add explicit course-version lineage before multiple published course revisions are needed.
+- **Next:** Milestone 6 should establish reviewed audio, video, illustration, caption, transcript, localization, and replacement workflows before expanding media-heavy lessons.
 
 ### Milestone 6 - Educational Media Pipeline
 
@@ -507,3 +511,4 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 - **2026-07-17:** Milestone 5H adds a readable revision-comparison view rather than relying on authors to infer changes from version numbers. The remaining proof is real Foundations migration through the completed workflow.
 - **2026-07-17:** The public Academy now prefers a cacheable, read-only published-content API. It excludes drafts, incomplete course paths, and unpublished lessons, and immediately falls back to bundled content when no complete published catalogue is available.
 - **2026-07-17:** Added an isolated Docker Compose staging stack and guarded development-account seed command for the author, reviewer, publisher, and administrator workflow. It is the required environment for the final Milestone 5 publication demonstration.
+- **2026-07-17:** Milestone 5 completed after a clean staging run proved author/reviewer/publisher permissions, draft privacy, four-lesson Foundations publication, cacheable public delivery, desktop/mobile learner rendering, bundled fallback behavior, and clean-volume reproducibility.

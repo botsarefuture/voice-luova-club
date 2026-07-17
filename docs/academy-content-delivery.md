@@ -7,3 +7,5 @@ The React Academy renders bundled versioned content immediately, then replaces i
 Courses and lessons follow the same author, reviewer, publisher separation. An author saves and submits a draft, a reviewer completes content, research, and accessibility checks, and a publisher releases the immutable record. A course cannot be publicly visible until every lesson it orders is published.
 
 The final Foundations migration must be performed through those identities in the Admin Academy. Automation must not silently mark educational content reviewed or published.
+
+Milestone 5 staging validation completed that workflow with the four current Foundations lessons. The learner UI displayed the governed four-lesson course on desktop and a 390px viewport without horizontal overflow. Empty or unavailable compatible catalogues continue to resolve to the bundled recovery content.

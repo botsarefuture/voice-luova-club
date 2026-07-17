@@ -1,11 +1,12 @@
 """Create only local staging identities. Never run against production."""
 import os
-from datetime import datetime, timezone
-from pymongo import MongoClient
-from werkzeug.security import generate_password_hash
 
 if os.environ.get("FEMMEVOICE_ENV") != "staging":
     raise SystemExit("Refusing to seed: FEMMEVOICE_ENV must be staging.")
+
+from datetime import datetime, timezone
+from pymongo import MongoClient
+from werkzeug.security import generate_password_hash
 
 db = MongoClient(os.environ["MONGO_URI"])[os.environ["MONGO_DB"]]
 password = os.environ.get("FEMMEVOICE_STAGING_PASSWORD", "FemmeVoice staging passphrase 2026")

@@ -175,7 +175,7 @@ function validateBlockContent(block, errors) {
     case "image":
     case "audio":
     case "video":
-      if (content.src !== undefined && !isNonEmptyString(content.src)) error("has an invalid media source");
+      if (!isNonEmptyString(content.src)) error("needs a media source");
       break;
     default:
       break;
