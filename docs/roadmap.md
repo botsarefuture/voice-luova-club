@@ -8,10 +8,10 @@
 
 | Item | Current state |
 | --- | --- |
-| Current milestone | Milestone 5E - Structured lesson forms, in progress |
-| Current version | `v0.3.22` |
-| Current working branch | `feat/academy-lesson-forms` |
-| Active pull request(s) | Structured-lesson-forms PR in preparation. PRs #9-#11 are integrated into `main`. |
+| Current milestone | Milestone 5F - Structured course forms and ordering, in progress |
+| Current version | `v0.3.23` |
+| Current working branch | `feat/academy-course-forms` |
+| Active pull request(s) | Structured-course-forms PR in preparation. PR #12 is integrated into `main`. |
 | Base branch | `main` is canonical. |
 | Next planned milestone | Course forms and ordering, then review/publish controls and Foundations migration |
 | Overall completion estimate | About 30% of the long-term Academy vision; the core engine is complete, while history, authoring, media, curriculum, and coaching remain substantial work. |
@@ -46,6 +46,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 - `v0.3.20` - Academy block authoring controls
 - `v0.3.21` - Academy course management
 - `v0.3.22` - Structured lesson authoring forms
+- `v0.3.23` - Structured course authoring and ordering forms
 
 Update this list whenever a versioned change is pushed so milestones, pull requests, and releases remain easy to correlate.
 
@@ -349,9 +350,24 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 - [x] Raw structured documents are hidden behind an explicitly labelled advanced escape hatch.
 
 **Remaining**
-- [ ] Move the course editor from raw JSON to practical metadata and ordering forms.
 - [ ] Add authoring controls for review submission, review decisions, publishing, and revision comparison.
 - [ ] Use the full workflow to migrate and maintain the complete Foundations curriculum.
+
+#### Milestone 5F - Structured Course Forms And Ordering
+
+**Status:** 🚧 In Progress
+**Goal:** Make course metadata and learner-facing lesson ordering practical to maintain without raw JSON.
+
+**Dependencies:** Milestones 5A and 5D
+
+**Delivered in this slice**
+- [x] Structured course metadata form using the existing validated course contract.
+- [x] Available lesson picker, duplicate prevention, and keyboard-accessible earlier/later/remove ordering controls.
+- [x] Saved course draft browser and real Foundations course fixture.
+
+**Remaining**
+- [ ] Validate the complete course-management workflow against migrated Foundations content.
+- [ ] Add authoring controls for review submission, review decisions, publishing, and revision comparison.
 
 ### Milestone 6 - Educational Media Pipeline
 
@@ -452,3 +468,4 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 - **2026-07-17:** Milestone 5C adds small block controls directly around the real Foundations lesson document. This keeps block ordering accessible and schema-backed, while course editing remains a separate focused PR.
 - **2026-07-17:** Milestone 5D adds a validated course draft contract and seeds the real Foundations path through the Admin Academy. Interactive practice remains research/design work until the authoring workflow is reviewed.
 - **2026-07-17:** Milestone 5E begins the normal-form authoring path. Lesson details, research evidence, safety/accessibility notes, translation references, and every existing block type are editable through structured controls; the canonical raw document remains an advanced escape hatch only.
+- **2026-07-17:** Milestone 5F replaces the remaining course JSON route with structured metadata and accessible ordering controls. The editor uses the existing course validation contract and starts from the real Foundations path.

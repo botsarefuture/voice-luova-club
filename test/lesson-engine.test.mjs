@@ -10,12 +10,13 @@ import { advanceLessonProgress, canCompleteBlock, createLessonProgress, createLe
 import { addAcademyJournalEntry, clearAcademyHistory, createAcademyHistory, loadAcademyHistory, mergeAcademyHistories, recordLessonActivity, saveAcademyHistory, summarizeAcademyHistory } from "../src/academy/learnerHistory.js";
 import { LESSON_SCHEMA_VERSION, lessonDuration, validateLesson } from "../src/academy/schema.js";
 
-test("Admin Academy presents structured lesson authoring controls before the advanced JSON escape hatch", async () => {
+test("Admin Academy presents structured lesson and course authoring controls before JSON escape hatches", async () => {
   const vite = await createServer({ server: { middlewareMode: true }, appType: "custom" });
   try {
     const { default: AdminAcademy } = await vite.ssrLoadModule("/src/academy/AdminAcademy.jsx");
     const html = renderToStaticMarkup(createElement(AdminAcademy, { roles: ["author"] }));
     assert.match(html, /Start with a real lesson/);
+    assert.match(html, /Load Foundations course/);
     assert.doesNotMatch(html, /Lesson document/);
   } finally {
     await vite.close();

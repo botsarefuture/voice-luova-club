@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronDown, ChevronUp, Eye, FilePlus2, Save, ShieldCheck, Trash2 } from "lucide-react";
-import { listAcademyAdminLessons, loadAcademyAdminLesson, saveAcademyAdminLesson } from "../api";
+import { listAcademyAdminCourses, listAcademyAdminLessons, loadAcademyAdminLesson, saveAcademyAdminCourse, saveAcademyAdminLesson } from "../api";
+import { ACADEMY_COURSES } from "./catalog";
 import { FOUNDATIONS_LESSONS } from "./content/foundations";
 import LessonPlayer from "./LessonPlayer";
 import { validateLesson } from "./schema";
@@ -10,7 +11,9 @@ const completionKinds = ["manual", "optional", "response", "quiz", "activity"];
 
 export default function AdminAcademy({ roles }) {
   const [records, setRecords] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [lesson, setLesson] = useState(null);
+  const [course, setCourse] = useState(null);
   const [changeNote, setChangeNote] = useState("");
   const [status, setStatus] = useState("Loading Academy revisions...");
   const [preview, setPreview] = useState(false);
@@ -21,9 +24,10 @@ export default function AdminAcademy({ roles }) {
 
   async function refresh() {
     try {
-      const payload = await listAcademyAdminLessons();
-      setRecords(payload.lessons ?? []);
-      setStatus(payload.lessons?.length ? "" : "No saved Academy revisions yet. Start with a Foundations reference lesson below.");
+      const [lessonPayload, coursePayload] = await Promise.all([listAcademyAdminLessons(), listAcademyAdminCourses()]);
+      setRecords(lessonPayload.lessons ?? []);
+      setCourses(coursePayload.courses ?? []);
+      setStatus(lessonPayload.lessons?.length ? "" : "No saved Academy revisions yet. Start with a Foundations reference lesson below.");
     } catch (error) { setStatus(error.message); }
   }
 
@@ -55,6 +59,47 @@ export default function AdminAcademy({ roles }) {
       setStatus("Saving draft...");
       await saveAcademyAdminLesson(lesson.id, lesson.version, lesson, changeNote);
       setStatus("Draft saved. A reviewer must confirm content, research, and accessibility before it can be published.");
+      refresh();
+    } catch (error) { setStatus(error.message); }
+  }
+
+  function setCourseDraft(next, message) {
+    setCourse(next);
+    if (message) setStatus(message);
+  }
+
+  function startFoundationsCourse() {
+    const reference = ACADEMY_COURSES.find((item) => item.slug === "foundations");
+    setCourseDraft({
+      id: reference.slug,
+      slug: reference.slug,
+      title: reference.title,
+      summary: reference.summary,
+      locale: "en",
+      estimatedMinutes: reference.estimatedMinutes,
+      lessonIds: reference.lessons.map((item) => item.slug),
+      tags: ["foundations", "transfeminine"],
+      prerequisiteCourseIds: [],
+    }, "Foundations course loaded with its current lesson order.");
+  }
+
+  function openCourse(record) {
+    setCourseDraft(structuredClone(record.course), `Editing ${record.course.title}.`);
+  }
+
+  function updateCourse(mutator) {
+    if (!course) return;
+    const next = structuredClone(course);
+    mutator(next);
+    setCourseDraft(next);
+  }
+
+  async function saveCourse() {
+    if (!course || !roles.includes("author")) return;
+    try {
+      setStatus("Saving course draft...");
+      await saveAcademyAdminCourse(course.id, course);
+      setStatus("Course draft saved with its lesson order.");
       refresh();
     } catch (error) { setStatus(error.message); }
   }
@@ -92,6 +137,7 @@ export default function AdminAcademy({ roles }) {
         {status && <p className="privacy-status" role="status">{status}</p>}
       </div>
     </div>
+    <CourseEditor course={course} records={records} courses={courses} onStart={startFoundationsCourse} onOpen={openCourse} onChange={updateCourse} onSave={saveCourse} canAuthor={roles.includes("author")} />
   </section>;
 }
 
@@ -105,6 +151,16 @@ function LessonDetails({ lesson, onChange }) {
   const updateSafety = (field, value) => onChange((next) => { next.safety[field] = value; });
   const updateAccessibility = (field, value) => onChange((next) => { next.accessibility[field] = value; });
   return <section className="admin-form-section" aria-labelledby="lesson-details-title"><div><p className="eyebrow">Lesson details</p><h3 id="lesson-details-title">Give learners a clear, calm starting point.</h3></div><div className="admin-form-grid"><Field label="Lesson title" value={lesson.title} onChange={(value) => update("title", value)} required /><Field label="Slug" value={lesson.slug} onChange={(value) => update("slug", value)} required hint="Stable web identifier, for example: first-listening." /><Field label="Lesson ID" value={lesson.id} onChange={(value) => update("id", value)} required /><Field label="Version" value={lesson.version} type="number" min="1" onChange={(value) => update("version", numberOrZero(value))} required /><Field label="Locale" value={lesson.locale} onChange={(value) => update("locale", value)} required /><Field label="Estimated minutes" value={lesson.metadata.estimatedMinutes ?? ""} type="number" min="0" onChange={(value) => updateMetadata("estimatedMinutes", numberOrZero(value))} /><Field label="Learning objective" value={lesson.objective ?? ""} onChange={(value) => update("objective", value)} multiline /><Field label="Completion message" value={lesson.metadata.completionMessage ?? ""} onChange={(value) => updateMetadata("completionMessage", value)} multiline /><Field label="Tags" value={(lesson.metadata.tags ?? []).join(", ")} onChange={(value) => updateMetadata("tags", commaList(value))} hint="Comma separated. Visible only to authors for now." /><Field label="Translation locales" value={(lesson.translations ?? []).map((translation) => typeof translation === "string" ? translation : translation.locale).join(", ")} onChange={(value) => update("translations", commaList(value).map((locale) => ({ locale })))} hint="Translation-ready locale references; translated content stays in a separate revision." /></div><div className="admin-form-columns"><fieldset><legend>Voice and learner safety</legend><Field label="Safety note" value={lesson.safety.note ?? ""} onChange={(value) => updateSafety("note", value)} multiline /><Field label="Stop signals" value={(lesson.safety.stopSignals ?? []).join(", ")} onChange={(value) => updateSafety("stopSignals", commaList(value))} hint="Comma separated, e.g. pain, persistent hoarseness." /><Field label="Lower-intensity alternative" value={lesson.safety.lowerIntensityAlternative ?? ""} onChange={(value) => updateSafety("lowerIntensityAlternative", value)} multiline /></fieldset><fieldset><legend>Lesson accessibility</legend><Field label="Text alternative or access note" value={lesson.accessibility.alternative ?? ""} onChange={(value) => updateAccessibility("alternative", value)} multiline /><Field label="Reduced-motion alternative" value={lesson.accessibility.reducedMotionAlternative ?? ""} onChange={(value) => updateAccessibility("reducedMotionAlternative", value)} multiline /></fieldset></div></section>;
+}
+
+function CourseEditor({ course, records, courses, onStart, onOpen, onChange, onSave, canAuthor }) {
+  const availableLessons = uniqueLessons(records);
+  const savedCourseRecords = courses.filter((record) => record.course);
+  const update = (field, value) => onChange((next) => { next[field] = value; });
+  const moveLesson = (index, direction) => onChange((next) => { const target = index + direction; if (target < 0 || target >= next.lessonIds.length) return; [next.lessonIds[index], next.lessonIds[target]] = [next.lessonIds[target], next.lessonIds[index]]; });
+  const removeLesson = (index) => onChange((next) => { next.lessonIds.splice(index, 1); });
+  const addLesson = (lessonId) => onChange((next) => { if (lessonId && !next.lessonIds.includes(lessonId)) next.lessonIds.push(lessonId); });
+  return <section className="admin-course-editor" aria-labelledby="admin-course-title"><div><p className="eyebrow">Course structure</p><h3 id="admin-course-title">Keep the learning path legible.</h3><p>Courses have an intentional order. Learners can pause, but authors should make the next useful step obvious.</p><button type="button" className="secondary-action" onClick={onStart}><FilePlus2 /> Load Foundations course</button>{savedCourseRecords.length > 0 && <div className="admin-saved-course-list"><strong>Saved drafts</strong>{savedCourseRecords.map((record) => <button type="button" key={record.course_id} onClick={() => onOpen(record)}>{record.course.title}<span>{record.status}</span></button>)}</div>}</div>{!course ? <div className="admin-course-empty"><p>Load the Foundations course to edit its metadata and order with structured controls.</p></div> : <div className="admin-course-form"><div className="admin-form-grid"><Field label="Course title" value={course.title} onChange={(value) => update("title", value)} required /><Field label="Slug" value={course.slug} onChange={(value) => update("slug", value)} required /><Field label="Course ID" value={course.id} onChange={(value) => update("id", value)} required /><Field label="Locale" value={course.locale} onChange={(value) => update("locale", value)} required /><Field label="Estimated minutes" value={course.estimatedMinutes} type="number" min="0" onChange={(value) => update("estimatedMinutes", numberOrZero(value))} required /><Field label="Tags" value={(course.tags ?? []).join(", ")} onChange={(value) => update("tags", commaList(value))} hint="Comma separated." /><Field label="Course summary" value={course.summary} onChange={(value) => update("summary", value)} multiline required /><Field label="Prerequisite course IDs" value={(course.prerequisiteCourseIds ?? []).join(", ")} onChange={(value) => update("prerequisiteCourseIds", commaList(value))} hint="Future-ready; not enforced for learners yet." /></div><section className="admin-course-lessons" aria-labelledby="course-lessons-title"><div className="admin-section-heading"><div><p className="eyebrow">Lesson order</p><h4 id="course-lessons-title">Build the route learners will follow.</h4></div><label className="inline-select">Add available lesson<select value="" onChange={(event) => { if (event.target.value) addLesson(event.target.value); }}><option value="">Choose a lesson...</option>{availableLessons.filter((item) => !course.lessonIds.includes(item.id)).map((item) => <option value={item.id} key={item.id}>{item.title}</option>)}</select></label></div>{course.lessonIds.length === 0 ? <p className="lesson-muted">Add at least one lesson to define this course.</p> : <ol className="admin-course-lesson-list">{course.lessonIds.map((lessonId, index) => { const item = availableLessons.find((candidate) => candidate.id === lessonId); return <li key={`${lessonId}-${index}`}><span><strong>{index + 1}. {item?.title ?? lessonId}</strong><small>{lessonId}</small></span><div><button type="button" className="icon-action" disabled={index === 0} onClick={() => moveLesson(index, -1)} aria-label={`Move ${item?.title ?? lessonId} earlier`}><ChevronUp /></button><button type="button" className="icon-action" disabled={index === course.lessonIds.length - 1} onClick={() => moveLesson(index, 1)} aria-label={`Move ${item?.title ?? lessonId} later`}><ChevronDown /></button><button type="button" className="icon-action danger-action" onClick={() => removeLesson(index)} aria-label={`Remove ${item?.title ?? lessonId} from this course`}><Trash2 /></button></div></li>; })}</ol>}</section><button type="button" className="primary-action" onClick={onSave} disabled={!canAuthor}><Save /> Save course draft</button></div>}</section>;
 }
 
 function EvidenceEditor({ lesson, onChange }) {
@@ -163,6 +219,11 @@ function Field({ label, value, onChange, multiline = false, hint, required = fal
 
 function commaList(value) { return value.split(",").map((item) => item.trim()).filter(Boolean); }
 function numberOrZero(value) { return value === "" ? 0 : Number(value); }
+function uniqueLessons(records) {
+  const staticLessons = FOUNDATIONS_LESSONS.map((lesson) => ({ id: lesson.slug, title: lesson.title }));
+  const savedLessons = records.map((record) => ({ id: record.lesson_id, title: record.title }));
+  return [...staticLessons, ...savedLessons].filter((item, index, items) => items.findIndex((candidate) => candidate.id === item.id) === index);
+}
 function richTextToPlainText(nodes = []) { return nodes.map((node) => node.type === "list" ? node.items.map((item) => item.map((child) => child.value).join("")).join("\n") : (node.children ?? []).map((child) => child.value).join("")).join("\n\n"); }
 function plainTextToRichText(value) { return value.split(/\n\s*\n/).map((paragraph) => ({ type: "paragraph", children: [{ type: "text", value: paragraph.trim() || " " }] })); }
 
