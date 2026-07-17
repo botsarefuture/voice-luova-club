@@ -21,6 +21,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 from academy_history import normalize_academy_history
 from academy_content import build_public_catalogue, can_submit_for_review, resolve_published_lesson_refs, review_result_status, validate_course_document, validate_lesson_document, validate_review
+from academy_media import build_public_media_manifest, media_review_result_status, validate_media_asset, validate_media_review
 from reminder_logic import VALID_REMINDER_TONES, normalize_reminder_days
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -84,6 +85,7 @@ recordings_collection = db["private_recordings"]
 academy_history_collection = db["academy_history"]
 academy_lessons_collection = db["academy_lessons"]
 academy_courses_collection = db["academy_courses"]
+academy_media_collection = db["academy_media"]
 recordings_bucket = GridFSBucket(db, bucket_name="private_recordings")
 progress_collection.create_index([("device_id", ASCENDING)])
 progress_collection.create_index([("storage_key", ASCENDING)], unique=True)
@@ -96,6 +98,8 @@ academy_history_collection.create_index([("user_id", ASCENDING)], unique=True)
 academy_lessons_collection.create_index([("lesson_id", ASCENDING), ("version", ASCENDING)], unique=True)
 academy_lessons_collection.create_index([("status", ASCENDING), ("updated_at", ASCENDING)])
 academy_courses_collection.create_index([("course_id", ASCENDING), ("version", ASCENDING)], unique=True)
+academy_media_collection.create_index([("asset_id", ASCENDING), ("version", ASCENDING), ("locale", ASCENDING)], unique=True)
+academy_media_collection.create_index([("status", ASCENDING), ("updated_at", ASCENDING)])
 
 
 @app.after_request
@@ -113,7 +117,8 @@ def apply_security_headers(response):
     response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
     if request.is_secure:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    if request.path.startswith("/api/auth/") or request.path.startswith("/api/privacy/") or request.path.startswith("/api/recordings") or request.path.startswith("/api/admin/") or (request.path.startswith("/api/academy/") and request.path != "/api/academy/content") or request.path.startswith("/api/account/academy-history"):
+    public_academy_paths = {"/api/academy/content", "/api/academy/media"}
+    if request.path.startswith("/api/auth/") or request.path.startswith("/api/privacy/") or request.path.startswith("/api/recordings") or request.path.startswith("/api/admin/") or (request.path.startswith("/api/academy/") and request.path not in public_academy_paths) or request.path.startswith("/api/account/academy-history"):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -550,6 +555,124 @@ def public_academy_content():
     response = jsonify(build_public_catalogue(courses, lessons))
     response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=300"
     return response
+
+
+@app.get("/api/academy/media")
+def public_academy_media():
+    records = list(academy_media_collection.find({"status": "published"}, {"_id": 0, "asset": 1, "published_at": 1}).limit(1000))
+    response = jsonify(build_public_media_manifest(records))
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=3600"
+    return response
+
+
+@app.get("/api/admin/academy/media")
+def list_academy_media_for_admin():
+    user = user_from_request()
+    if not user or not user["academy_roles"]:
+        return auth_error("Academy media access is required.", 403)
+    records = list(academy_media_collection.find({}, {"_id": 0, "asset": 0}).sort("updated_at", -1).limit(1000))
+    return jsonify({"roles": user["academy_roles"], "assets": records})
+
+
+@app.get("/api/admin/academy/media/<asset_id>/<int:version>/<locale>")
+def get_academy_media_for_admin(asset_id, version, locale):
+    user = user_from_request()
+    if not user or not user["academy_roles"]:
+        return auth_error("Academy media access is required.", 403)
+    record = academy_media_collection.find_one({"asset_id": asset_id, "version": version, "locale": locale}, {"_id": 0})
+    if not record:
+        return auth_error("Academy media revision was not found.", 404)
+    return jsonify(record)
+
+
+@app.put("/api/admin/academy/media/<asset_id>/<int:version>/<locale>")
+def save_academy_media_draft(asset_id, version, locale):
+    if not csrf_required():
+        return auth_error("Your session expired. Refresh and try again.", 403)
+    user = academy_user_with_role("author")
+    if not user:
+        return auth_error("Academy author access is required.", 403)
+    if request.content_length and request.content_length > 100_000:
+        return auth_error("Media metadata is too large.", 413)
+    try:
+        asset = validate_media_asset((request.get_json(silent=True) or {}).get("asset"), require_review=False, publication_ready=False)
+    except ValueError as error:
+        return auth_error(str(error))
+    if asset["id"] != asset_id or asset["version"] != version or asset["locale"] != locale:
+        return auth_error("Media path must match the asset id, version, and locale.")
+    existing = academy_media_collection.find_one({"asset_id": asset_id, "version": version, "locale": locale})
+    if existing and existing.get("status") == "published":
+        return auth_error("Published media revisions are immutable. Create a new version or localization.", 409)
+    timestamp = now_iso()
+    academy_media_collection.update_one(
+        {"asset_id": asset_id, "version": version, "locale": locale},
+        {"$set": {"asset_id": asset_id, "version": version, "locale": locale, "title": asset["title"], "kind": asset["kind"], "asset": asset, "status": "draft", "updated_at": timestamp, "authored_by": user["username"]}, "$setOnInsert": {"created_at": timestamp}},
+        upsert=True,
+    )
+    return jsonify({"ok": True, "status": "draft", "updated_at": timestamp})
+
+
+@app.put("/api/admin/academy/media/<asset_id>/<int:version>/<locale>/submit-review")
+def submit_academy_media_for_review(asset_id, version, locale):
+    if not csrf_required():
+        return auth_error("Your session expired. Refresh and try again.", 403)
+    user = academy_user_with_role("author")
+    record = academy_media_collection.find_one({"asset_id": asset_id, "version": version, "locale": locale})
+    if not user:
+        return auth_error("Academy author access is required.", 403)
+    if not record:
+        return auth_error("Save the media draft before requesting review.", 404)
+    if not can_submit_for_review(record.get("status")):
+        return auth_error("Only a draft media revision can be submitted for review.", 409)
+    try:
+        validate_media_asset(record["asset"], require_review=False)
+    except ValueError as error:
+        return auth_error(str(error))
+    academy_media_collection.update_one({"_id": record["_id"]}, {"$set": {"status": "review_requested", "review_requested_at": now_iso(), "review_requested_by": user["username"], "updated_at": now_iso()}})
+    return jsonify({"ok": True, "status": "review_requested"})
+
+
+@app.put("/api/admin/academy/media/<asset_id>/<int:version>/<locale>/review")
+def review_academy_media(asset_id, version, locale):
+    if not csrf_required():
+        return auth_error("Your session expired. Refresh and try again.", 403)
+    user = academy_user_with_role("reviewer")
+    record = academy_media_collection.find_one({"asset_id": asset_id, "version": version, "locale": locale})
+    if not user:
+        return auth_error("Academy reviewer access is required.", 403)
+    if not record:
+        return auth_error("Academy media revision was not found.", 404)
+    if record.get("status") != "review_requested":
+        return auth_error("An author must submit this media revision for review first.", 409)
+    try:
+        review = validate_media_review((request.get_json(silent=True) or {}).get("review"), require_approved=True)
+    except ValueError as error:
+        return auth_error(str(error))
+    review.update({"reviewed_by": user["username"], "reviewed_at": now_iso()})
+    asset = {**record["asset"], "review": {key: review[key] for key in ("decision", "content_checked", "research_checked", "accessibility_checked", "note")}}
+    status = media_review_result_status(review["decision"])
+    academy_media_collection.update_one({"_id": record["_id"]}, {"$set": {"asset": asset, "status": status, "review": review, "updated_at": now_iso()}})
+    return jsonify({"ok": True, "status": status, "review": review})
+
+
+@app.put("/api/admin/academy/media/<asset_id>/<int:version>/<locale>/publish")
+def publish_academy_media(asset_id, version, locale):
+    if not csrf_required():
+        return auth_error("Your session expired. Refresh and try again.", 403)
+    user = academy_user_with_role("publisher")
+    record = academy_media_collection.find_one({"asset_id": asset_id, "version": version, "locale": locale})
+    if not user:
+        return auth_error("Academy publisher access is required.", 403)
+    if not record:
+        return auth_error("Academy media revision was not found.", 404)
+    if record.get("status") != "in_review" or record.get("review", {}).get("decision") != "approved":
+        return auth_error("An approved media review is required before publishing.", 409)
+    try:
+        validate_media_asset(record["asset"], require_review=True)
+    except ValueError as error:
+        return auth_error(str(error), 409)
+    academy_media_collection.update_one({"_id": record["_id"]}, {"$set": {"status": "published", "published_at": now_iso(), "published_by": user["username"], "updated_at": now_iso()}})
+    return jsonify({"ok": True, "status": "published"})
 
 
 @app.get("/api/admin/academy/lessons")

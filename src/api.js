@@ -201,6 +201,34 @@ export async function submitAcademyAdminCourseForReview(id, version) { return se
 export async function reviewAcademyAdminCourse(id, version, review) { return secureRequest(`/api/admin/academy/courses/${encodeURIComponent(id)}/${version}/review`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ review }) }); }
 export async function publishAcademyAdminCourse(id, version) { return secureRequest(`/api/admin/academy/courses/${encodeURIComponent(id)}/${version}/publish`, { method: "PUT" }); }
 
+export async function listAcademyAdminMedia() {
+  const response = await fetch("/api/admin/academy/media", { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error("Could not load Academy media.");
+  return response.json();
+}
+
+export async function loadAcademyAdminMedia(id, version, locale) {
+  const response = await fetch(`/api/admin/academy/media/${encodeURIComponent(id)}/${version}/${encodeURIComponent(locale)}`, { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error("Could not load this media revision.");
+  return response.json();
+}
+
+export async function saveAcademyAdminMedia(id, version, locale, asset) {
+  return secureRequest(`/api/admin/academy/media/${encodeURIComponent(id)}/${version}/${encodeURIComponent(locale)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ asset }) });
+}
+
+export async function submitAcademyAdminMediaForReview(id, version, locale) {
+  return secureRequest(`/api/admin/academy/media/${encodeURIComponent(id)}/${version}/${encodeURIComponent(locale)}/submit-review`, { method: "PUT" });
+}
+
+export async function reviewAcademyAdminMedia(id, version, locale, review) {
+  return secureRequest(`/api/admin/academy/media/${encodeURIComponent(id)}/${version}/${encodeURIComponent(locale)}/review`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ review }) });
+}
+
+export async function publishAcademyAdminMedia(id, version, locale) {
+  return secureRequest(`/api/admin/academy/media/${encodeURIComponent(id)}/${version}/${encodeURIComponent(locale)}/publish`, { method: "PUT" });
+}
+
 export async function listPrivateRecordings() {
   const response = await fetch("/api/recordings", { headers: { Accept: "application/json" } });
   if (!response.ok) throw new Error("Could not load private recordings.");

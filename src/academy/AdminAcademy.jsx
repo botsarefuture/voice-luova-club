@@ -7,6 +7,7 @@ import LessonPlayer from "./LessonPlayer";
 import { validateLesson } from "./schema";
 import { BLOCK_TYPES, getBlockDefinition } from "./blockRegistry";
 import { createBlankCourse, createBlankLesson, createNextCourseRevision, createNextLessonRevision } from "./authoringTemplates";
+import AdminMediaLibrary from "./AdminMediaLibrary";
 
 const completionKinds = ["manual", "optional", "response", "quiz", "activity"];
 
@@ -247,6 +248,7 @@ export default function AdminAcademy({ roles }) {
       </div>
     </div>
     <CourseEditor course={course} records={records} courses={courses} onCreate={startBlankCourse} onStart={startFoundationsCourse} onOpen={openCourse} onChange={updateCourse} onSave={saveCourse} onNewRevision={startNextCourseRevision} canAuthor={roles.includes("author")} status={courseStatus} review={courseReview} onReviewChange={setCourseReview} roles={roles} onTransition={courseTransition} />
+    <AdminMediaLibrary roles={roles} />
   </section>;
 }
 

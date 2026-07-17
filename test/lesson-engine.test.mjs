@@ -29,6 +29,7 @@ test("Admin Academy presents structured lesson and course authoring controls bef
     assert.match(html, /New blank lesson/);
     assert.match(html, /New course/);
     assert.match(html, /Load Foundations course/);
+    assert.match(html, /Educational media/);
     assert.doesNotMatch(html, /Lesson document/);
   } finally {
     await vite.close();

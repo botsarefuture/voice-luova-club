@@ -2,18 +2,18 @@
 
 **Status:** living implementation guide  
 **Last updated:** 17 July 2026  
-**Current development phase:** Milestone 5 authoring closure, ready for validation before Milestone 6 resumes
+**Current development phase:** Milestone 6 educational media governance and delivery
 
 ## Active Development
 
 | Item | Current state |
 | --- | --- |
-| Current milestone | Milestone 5 authoring closure: blank creation and explicit revision paths |
-| Current version | `v0.3.30` |
-| Current working branch | `fix/academy-authoring-closure` |
-| Active pull request(s) | PR #19 - Academy authoring closure; PR #18 is integrated into `main`. |
+| Current milestone | Milestone 6 - Educational Media Pipeline |
+| Current version | `v0.3.31` |
+| Current working branch | `feat/academy-media-library` |
+| Active pull request(s) | Governed media-library PR in preparation; PR #19 is integrated into `main`. |
 | Base branch | `main` is canonical. |
-| Next planned milestone | Resume Milestone 6 - Educational Media Pipeline |
+| Next planned milestone | Continue Milestone 6 with deterministic lesson asset references and public resolution. |
 | Overall completion estimate | About 40% of the long-term Academy vision; engine, history, governance, authoring, and delivery are complete, while media, remaining curriculum, and coaching remain substantial work. |
 
 ## Vision
@@ -54,6 +54,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 - `v0.3.28` - Milestone 5 end-to-end governance validation
 - `v0.3.29` - Versioned educational media contract
 - `v0.3.30` - Blank Academy authoring and immutable course/lesson revision paths
+- `v0.3.31` - Governed Academy media library and publication workflow
 
 Update this list whenever a versioned change is pushed so milestones, pull requests, and releases remain easy to correlate.
 
@@ -430,6 +431,11 @@ Milestone 5 ends when a contributor can comfortably maintain the complete Founda
 **In progress**
 - [x] Versioned media contract covers locale, source, rights, accessibility metadata, and three-part review.
 - [x] Existing Foundations voice-pathway illustration validates as the first real asset fixture.
+- [x] Read-only public media manifest exposes only published revisions and carries cache directives.
+- [x] Admin Media Library supports draft, review, publish, replacement, and localization metadata workflows.
+- [x] Drafts may be incomplete, while review submission rejects placeholders and missing rights or accessible alternatives.
+- [ ] Lesson media blocks reference deterministic governed asset revisions and resolve them through the public manifest.
+- [ ] Validate replacement and localization resolution with real Foundations lesson content.
 
 ### Milestone 7 - Remaining Foundations Lessons
 
@@ -470,6 +476,7 @@ The existing `interactive_exercise` block remains suitable for simple learner-le
 - Academy history must remain a separate versioned contract. Milestone 4A establishes useful local history; Milestone 4B owns migration, retention, export, deletion, multi-device conflict handling, and explicit sync consent.
 - Existing production course records require the documented one-time version-index migration before a second course revision is saved.
 - Public media needs a storage/CDN strategy; do not put large course video into the existing encrypted-recording vault.
+- Media metadata governance is implemented, but binary upload/storage is intentionally pending a dedicated storage decision. Current assets use reviewed local or HTTPS sources.
 - Lesson authoring must enforce captions, transcripts, evidence, and safety metadata, or content quality will drift.
 - Community features require funded human moderation and safeguarding; they are not a learner MVP dependency.
 - Native iOS work depends on later API-token and audio-provider boundaries described in the iOS readiness plan.
@@ -530,3 +537,4 @@ The existing `interactive_exercise` block remains suitable for simple learner-le
 - **2026-07-17:** Added an isolated Docker Compose staging stack and guarded development-account seed command for the author, reviewer, publisher, and administrator workflow. It is the required environment for the final Milestone 5 publication demonstration.
 - **2026-07-17:** Milestone 5 completed after a clean staging run proved author/reviewer/publisher permissions, draft privacy, four-lesson Foundations publication, cacheable public delivery, desktop/mobile learner rendering, bundled fallback behavior, and clean-volume reproducibility.
 - **2026-07-17:** A roadmap truth audit found missing blank-authoring controls and no practical revision path for published courses. The closure patch adds blank documents, explicit next-version actions, versioned course lineage, and deterministic lesson references before Milestone 6 resumes.
+- **2026-07-17:** Milestone 6 begins with a governed media library. Authors can save incomplete private drafts, but only real checksummed assets with complete rights and kind-specific accessibility metadata may enter role-separated review and publication. Published metadata is exposed through a cacheable read-only manifest; lesson resolution follows in the next focused slice.
