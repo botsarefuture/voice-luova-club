@@ -2,13 +2,14 @@ import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, Clock3, ShieldCheck } fr
 import { ACADEMY_COURSES, formatCourseDuration, getAcademyCourse } from "./catalog";
 import LessonPlayer from "./LessonPlayer";
 import { getFoundationsLesson } from "./content/foundations";
+import AcademyHistory from "./AcademyHistory";
 
-export default function AcademyView({ courseSlug, lessonSlug, onOpenCourse, onBack }) {
+export default function AcademyView({ courseSlug, lessonSlug, onOpenCourse, onBack, history, onLessonHistory, onDeleteHistory, onAddJournal }) {
   const course = courseSlug ? getAcademyCourse(courseSlug) : null;
   const lesson = courseSlug === "foundations" && lessonSlug ? getFoundationsLesson(lessonSlug) : null;
 
   if (course && lesson) {
-    return <LessonPlayer key={`${lesson.id}:${lesson.version}`} lesson={lesson} courseTitle={course.title} onExit={() => onOpenCourse(course.slug)} />;
+    return <LessonPlayer key={`${lesson.id}:${lesson.version}`} lesson={lesson} courseTitle={course.title} courseSlug={course.slug} onHistoryEvent={onLessonHistory} onExit={() => onOpenCourse(course.slug)} />;
   }
 
   if (course && lessonSlug) {
@@ -26,7 +27,7 @@ export default function AcademyView({ courseSlug, lessonSlug, onOpenCourse, onBa
     );
   }
 
-  if (course) return <CourseOverview course={course} onBack={onBack} onOpenLesson={(nextLessonSlug) => onOpenCourse(course.slug, nextLessonSlug)} />;
+  if (course) return <CourseOverview course={course} history={history} onBack={onBack} onOpenLesson={(nextLessonSlug) => onOpenCourse(course.slug, nextLessonSlug)} onDeleteHistory={onDeleteHistory} onAddJournal={onAddJournal} />;
 
   return (
     <section className="academy-page" aria-labelledby="academy-title">
@@ -73,7 +74,7 @@ export default function AcademyView({ courseSlug, lessonSlug, onOpenCourse, onBa
   );
 }
 
-function CourseOverview({ course, onBack, onOpenLesson }) {
+function CourseOverview({ course, history, onBack, onOpenLesson, onDeleteHistory, onAddJournal }) {
   return (
     <section className="academy-page academy-course-page" aria-labelledby="academy-course-title">
       <button type="button" className="academy-back" onClick={onBack}><ArrowLeft /> Academy home</button>
@@ -87,6 +88,8 @@ function CourseOverview({ course, onBack, onOpenLesson }) {
       </header>
 
       <aside className="academy-safety-note"><ShieldCheck aria-hidden="true" /><div><strong>Comfort-first course</strong><p>{course.safetyNote}</p></div></aside>
+
+      <AcademyHistory history={history} course={course} onDeleteHistory={onDeleteHistory} onAddJournal={onAddJournal} />
 
       <section className="academy-lesson-map" aria-labelledby="academy-lesson-map-title">
         <div><p className="eyebrow">Start here</p><h3 id="academy-lesson-map-title">Four gentle lessons are ready when you are.</h3><p>Each one is short, saves a safe place to return to, and works without a microphone or recording.</p></div>

@@ -23,7 +23,7 @@ Progress sync stores only app progress data. Audio analysis runs in the browser.
 
 Training includes selectable Starter, Steady, and Deep session tiers, guided hum-to-vowel warmups, adaptive pitch matching, brightness exploration, speech transfer, and rest reminders so users do not overtrain. The pitch ladder begins from an easy detected hum (or a gentle starter note), uses small intervals, and accepts a close, steady match rather than demanding exact cents.
 
-The Academy catalogue is available at `#academy`. Foundations currently has four short, safety-annotated lessons for newcomers, followed by a clearly marked course map for the remaining reviewed content. The generic player saves a private safe breakpoint locally; durable academy completion history is planned for a later milestone.
+The Academy catalogue is available at `#academy`. Foundations currently has four short, safety-annotated lessons for newcomers, followed by a clearly marked course map for the remaining reviewed content. The generic player saves a private safe breakpoint locally. Academy learner history is local-first: it records only lesson participation, active learning time, and notes the learner deliberately writes; account sync remains a separate future opt-in.
 
 The product intentionally does not claim to detect resonance, vocal weight, or vocal health from microphone data. It measures pitch, pitch stability, and level locally in the browser, then presents listening prompts and safe-practice guidance for the rest.
 

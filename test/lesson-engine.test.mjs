@@ -7,6 +7,7 @@ import { BLOCK_TYPES, getBlockDefinition } from "../src/academy/blockRegistry.js
 import { LESSON_PLAYER_PREVIEW } from "../src/academy/content/lessonPlayerPreview.js";
 import { FOUNDATIONS_LESSONS, getFoundationsLesson } from "../src/academy/content/foundations.js";
 import { advanceLessonProgress, canCompleteBlock, createLessonProgress, createLessonResumeStore, moveLessonProgress } from "../src/academy/lessonProgress.js";
+import { addAcademyJournalEntry, clearAcademyHistory, createAcademyHistory, loadAcademyHistory, recordLessonActivity, saveAcademyHistory, summarizeAcademyHistory } from "../src/academy/learnerHistory.js";
 import { LESSON_SCHEMA_VERSION, lessonDuration, validateLesson } from "../src/academy/schema.js";
 
 test("lesson fixture validates against the current versioned schema", () => {
@@ -190,6 +191,48 @@ test("optional steps, keyboard-style back navigation, and resume all reuse the s
   store.save(lesson, completed);
   assert.equal(createLessonProgress(lesson, store.load(lesson)).isComplete, true);
   assert.equal(createLessonProgress(lesson, { isComplete: true, completedBlockIds: ["optional"] }).isComplete, false);
+});
+
+test("Academy history is local, participation-based, and never stores lesson responses", () => {
+  const storageValues = new Map();
+  const storage = { getItem: (key) => storageValues.get(key) ?? null, setItem: (key, value) => storageValues.set(key, value), removeItem: (key) => storageValues.delete(key) };
+  const lesson = { id: "lesson-a", slug: "lesson-a", version: 1, title: "A gentle lesson" };
+  const progress = { totalBlocks: 3, currentBlock: 2, completedBlockIds: ["one"], completionPercentage: 33, isComplete: false };
+  const recorded = recordLessonActivity(createAcademyHistory(), { courseSlug: "foundations", lesson, progress, sessionId: "session-a", activeSeconds: 45, now: "2026-07-17T10:00:00.000Z" });
+  const completed = recordLessonActivity(recorded, { courseSlug: "foundations", lesson, progress: { ...progress, currentBlock: 3, completedBlockIds: ["one", "two", "three"], completionPercentage: 100, isComplete: true }, sessionId: "session-a", activeSeconds: 70, now: "2026-07-17T10:02:00.000Z" });
+  const withNote = addAcademyJournalEntry(completed, { courseSlug: "foundations", lessonId: lesson.id, note: "A small win", ease: "okay", now: "2026-07-17T10:03:00.000Z" });
+  const summary = summarizeAcademyHistory(withNote, "foundations", [lesson]);
+
+  assert.equal(withNote.lessons[lesson.id].completed, true);
+  assert.equal(withNote.sessions[0].activeSeconds, 70);
+  assert.equal(withNote.journal[0].note, "A small win");
+  assert.equal("responses" in withNote.lessons[lesson.id], false);
+  assert.equal(summary.completedLessons, 1);
+  assert.equal(summary.totalActiveSeconds, 70);
+  assert.equal(summary.recentLessons[0].lessonId, lesson.id);
+
+  saveAcademyHistory(withNote, storage);
+  assert.deepEqual(loadAcademyHistory(storage), withNote);
+  assert.deepEqual(clearAcademyHistory(storage), createAcademyHistory());
+  assert.equal(storageValues.size, 0);
+
+  saveAcademyHistory(createAcademyHistory(), storage);
+  assert.equal(storageValues.size, 0);
+});
+
+test("a revised lesson does not inherit completion from an earlier version", () => {
+  const completed = recordLessonActivity(createAcademyHistory(), {
+    courseSlug: "foundations", lesson: { id: "lesson-a", slug: "lesson-a", version: 1, title: "Lesson" },
+    progress: { totalBlocks: 1, currentBlock: 1, completedBlockIds: ["one"], completionPercentage: 100, isComplete: true }, sessionId: "first", activeSeconds: 30,
+  });
+  const revised = recordLessonActivity(completed, {
+    courseSlug: "foundations", lesson: { id: "lesson-a", slug: "lesson-a", version: 2, title: "Lesson" },
+    progress: { totalBlocks: 2, currentBlock: 1, completedBlockIds: [], completionPercentage: 0, isComplete: false }, sessionId: "second", activeSeconds: 10,
+  });
+
+  assert.equal(revised.lessons["lesson-a"].lessonVersion, 2);
+  assert.equal(revised.lessons["lesson-a"].completed, false);
+  assert.equal(revised.lessons["lesson-a"].completionPercentage, 0);
 });
 
 test("every registered block has a renderable accessible player surface", async (t) => {

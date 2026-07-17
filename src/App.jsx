@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   BookOpen,
@@ -57,6 +57,7 @@ import {
 import { decryptRecording, deriveRecordingKey, encryptRecording } from "./recordings";
 import AcademyView from "./academy/AcademyView";
 import { academyRoute, parseAppRoute } from "./academy/routes";
+import { addAcademyJournalEntry, clearAcademyHistory, loadAcademyHistory, recordLessonActivity, saveAcademyHistory } from "./academy/learnerHistory";
 import { APP_VERSION } from "./version";
 
 const EXERCISE_STEPS = [0, 1, 2, 3, 5, 7, 8, 10, 12];
@@ -373,6 +374,7 @@ export default function App() {
   const [history, setHistory] = useState([]);
   const [dailySession, setDailySession] = useState(loadTodaySession);
   const [progress, setProgress] = useState(loadProgress);
+  const [academyHistory, setAcademyHistory] = useState(loadAcademyHistory);
   const [targetIndex, setTargetIndex] = useState(() => loadProgress().lastTargetIndex ?? 0);
   const [exerciseMode, setExerciseMode] = useState(() => loadProgress().lastMode ?? "comfort-ladder");
   const [activeStep, setActiveStep] = useState(() => loadProgress().lastStep ?? "warmup");
@@ -577,6 +579,10 @@ export default function App() {
     }, 500);
     return () => window.clearTimeout(timeout);
   }, [deviceId, progress]);
+
+  useEffect(() => {
+    saveAcademyHistory(academyHistory);
+  }, [academyHistory]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1103,6 +1109,18 @@ export default function App() {
     setAcademyLessonSlug(lessonSlug);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  const recordAcademyHistory = useCallback((event) => {
+    setAcademyHistory((currentHistory) => recordLessonActivity(currentHistory, event));
+  }, []);
+
+  const addAcademyJournal = useCallback((entry) => {
+    setAcademyHistory((currentHistory) => addAcademyJournalEntry(currentHistory, entry));
+  }, []);
+
+  const deleteLocalAcademyHistory = useCallback(() => {
+    setAcademyHistory(clearAcademyHistory());
+  }, []);
 
   function selectPracticeStep(stepId) {
     setActiveStep(stepId);
@@ -1946,6 +1964,10 @@ export default function App() {
       {activeView === "academy" && <AcademyView
         courseSlug={academyCourseSlug}
         lessonSlug={academyLessonSlug}
+        history={academyHistory}
+        onLessonHistory={recordAcademyHistory}
+        onAddJournal={addAcademyJournal}
+        onDeleteHistory={deleteLocalAcademyHistory}
         onOpenCourse={navigateToAcademy}
         onBack={() => navigateToAcademy()}
       />}

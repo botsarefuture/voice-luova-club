@@ -4,7 +4,7 @@ import { BlockRenderer } from "./BlockRenderer";
 import { advanceLessonProgress, canCompleteBlock, createLessonProgress, createLessonResumeStore, moveLessonProgress } from "./lessonProgress";
 import { normalizeLesson, validateLesson } from "./schema";
 
-export default function LessonPlayer({ lesson: lessonSource, courseTitle = "Academy", onExit }) {
+export default function LessonPlayer({ lesson: lessonSource, courseTitle = "Academy", courseSlug = null, onExit, onHistoryEvent }) {
   const lesson = useMemo(() => normalizeLesson(lessonSource), [lessonSource]);
   const validation = useMemo(() => validateLesson(lesson), [lesson]);
   const resumeStore = useMemo(() => createLessonResumeStore(), []);
@@ -14,6 +14,10 @@ export default function LessonPlayer({ lesson: lessonSource, courseTitle = "Acad
   const [hydrated, setHydrated] = useState(false);
   const lessonHeadingRef = useRef(null);
   const completionHeadingRef = useRef(null);
+  const sessionIdRef = useRef(null);
+  const reportedActivityRef = useRef({ seconds: -1, progressKey: null });
+  const latestActivityRef = useRef(null);
+  const [activeSeconds, setActiveSeconds] = useState(0);
 
   useEffect(() => {
     setHydrated(false);
@@ -21,6 +25,9 @@ export default function LessonPlayer({ lesson: lessonSource, courseTitle = "Acad
     setLessonState(createLessonProgress(lesson, resume ?? {}));
     setResponses({});
     setPaused(false);
+    setActiveSeconds(0);
+    sessionIdRef.current = `academy_${crypto.randomUUID?.() ?? `${Date.now()}_${Math.random()}`}`;
+    reportedActivityRef.current = { seconds: -1, progressKey: null };
     setHydrated(true);
   }, [lesson.id, lesson.version, resumeStore]);
 
@@ -32,6 +39,51 @@ export default function LessonPlayer({ lesson: lessonSource, courseTitle = "Acad
   const currentBlock = lesson.blocks[progress.blockIndex];
   const response = responses[currentBlock?.id] ?? {};
   const canContinue = currentBlock ? canCompleteBlock(currentBlock, response) : false;
+
+  useEffect(() => {
+    if (!hydrated || paused || progress.isComplete) return undefined;
+    let lastTick = Date.now();
+    const tick = () => {
+      if (document.visibilityState !== "visible") {
+        lastTick = Date.now();
+        return;
+      }
+      const now = Date.now();
+      const elapsed = Math.floor((now - lastTick) / 1000);
+      if (elapsed > 0) {
+        setActiveSeconds((seconds) => seconds + elapsed);
+        lastTick += elapsed * 1000;
+      }
+    };
+    const handleVisibility = () => { lastTick = Date.now(); };
+    const interval = window.setInterval(tick, 1000);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [hydrated, paused, progress.isComplete]);
+
+  useEffect(() => {
+    latestActivityRef.current = { lesson, courseSlug, progress, activeSeconds, sessionId: sessionIdRef.current };
+  }, [activeSeconds, courseSlug, lesson, progress]);
+
+  useEffect(() => {
+    if (!hydrated || !validation.valid || !onHistoryEvent || !sessionIdRef.current) return;
+    const progressKey = `${progress.blockIndex}:${progress.completedBlocks}:${progress.isComplete}`;
+    const shouldReport = progressKey !== reportedActivityRef.current.progressKey
+      || activeSeconds === 0
+      || activeSeconds - reportedActivityRef.current.seconds >= 15
+      || progress.isComplete;
+    if (!shouldReport) return;
+    reportedActivityRef.current = { seconds: activeSeconds, progressKey };
+    onHistoryEvent({ lesson, courseSlug, progress, activeSeconds, sessionId: sessionIdRef.current });
+  }, [activeSeconds, courseSlug, hydrated, lesson, onHistoryEvent, progress, validation.valid]);
+
+  useEffect(() => () => {
+    const activity = latestActivityRef.current;
+    if (activity && onHistoryEvent) onHistoryEvent(activity);
+  }, [lesson.id, lesson.version, onHistoryEvent]);
 
   useEffect(() => {
     if (hydrated && !progress.isComplete) lessonHeadingRef.current?.focus({ preventScroll: true });

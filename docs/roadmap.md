@@ -8,12 +8,12 @@
 
 | Item | Current state |
 | --- | --- |
-| Current milestone | Post-integration Academy review fixes; Milestone 4A resumes after this focused PR |
-| Current version | `v0.3.13` |
-| Current working branch | `fix/academy-review-feedback` |
-| Active pull request(s) | [PR #6](https://github.com/botsarefuture/FemmeVoice/pull/6) - Academy integration review fixes. [PR #5](https://github.com/botsarefuture/FemmeVoice/pull/5) integrated the completed Academy stack into `main`. |
-| Base branch | `main` is the canonical base. |
-| Next planned milestone | Milestone 4A - Local learner history and reflection |
+| Current milestone | Milestone 4A - Local learner history and reflection, ready for review |
+| Current version | `v0.3.15` |
+| Current working branch | `feat/academy-learner-history` |
+| Active pull request(s) | [PR #6](https://github.com/botsarefuture/FemmeVoice/pull/6) - Academy integration review fixes; [PR #7](https://github.com/botsarefuture/FemmeVoice/pull/7) - Milestone 4A local learner history. [PR #5](https://github.com/botsarefuture/FemmeVoice/pull/5) integrated the completed Academy stack into `main`. |
+| Base branch | Short stack: this branch temporarily targets PR #6 because it depends on its resume correction. Retarget it to `main` after PR #6 merges. |
+| Next planned milestone | Milestone 4B - Opt-in sync and privacy lifecycle |
 | Overall completion estimate | About 30% of the long-term Academy vision; the core engine is complete, while history, authoring, media, curriculum, and coaching remain substantial work. |
 
 ## Vision
@@ -37,6 +37,8 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 - `v0.3.11` - Academy Polish
 - `v0.3.12` - Academy integration review fixes
 - `v0.3.13` - Academy integration review PR readiness
+- `v0.3.14` - Academy local learner history and reflection
+- `v0.3.15` - Academy learner-history PR readiness
 
 Update this list whenever a versioned change is pushed so milestones, pull requests, and releases remain easy to correlate.
 
@@ -80,6 +82,7 @@ This keeps history understandable without forcing unrelated work into a prematur
 | 2026-07-17 | Keep Academy polish focused on clarity, accessibility, and truthful content. | Larger learner-history, media, and coaching changes need their own reviewable milestones. |
 | 2026-07-17 | Move content operations ahead of the transparent coach. | A larger curriculum needs consistent authoring, review, and publishing before recommendations can responsibly point learners to more content. |
 | 2026-07-17 | Treat the first four Foundations lessons as an MVP slice, not the complete course. | Remaining lessons will follow after learner history and content operations are established. |
+| 2026-07-17 | Keep Academy learner history local and separate from legacy practice progress. | It gives learners useful reflection and deletion/export controls without silently expanding account data collection. |
 
 ## Milestones
 
@@ -226,15 +229,21 @@ The generic engine is complete and has been validated with real, production-qual
 
 #### Milestone 4A - Local History And Reflection
 
-**Status:** 🚧 In Progress
+**Status:** 👀 Ready for Review
 **Goal:** Give learners a private, local record of completed lessons, active learning time, recently practised lessons, a short calendar, weekly summary, and optional notes.
 **Dependencies:** Milestones 2-3
 
 **Acceptance criteria**
-- [ ] No broken streaks, leaderboard, gender score, forced return path, or automatic capture of lesson responses.
-- [ ] Activity time counts only while a lesson is visible and active.
-- [ ] Notes are explicitly authored by the learner and local by default.
-- [ ] Local export and deletion are available without an account.
+- [x] No broken streaks, leaderboard, gender score, forced return path, or automatic capture of lesson responses.
+- [x] Activity time counts only while a lesson is visible and active.
+- [x] Notes are explicitly authored by the learner and local by default.
+- [x] Local export and deletion are available without an account.
+
+**Delivered**
+- [x] Versioned, bounded local history with lesson/session records, optional journal entries, normalization, and deletion.
+- [x] Course-level weekly summary, local-calendar activity view, recently opened lessons, and completion context.
+- [x] Export, delete, and privacy language that do not imply account sync.
+- [x] Version-aware lesson completion so a revised lesson does not inherit completion from an earlier revision.
 
 #### Milestone 4B - Opt-in Sync And Privacy Lifecycle
 
@@ -352,3 +361,4 @@ The generic engine is complete and has been validated with real, production-qual
 - **2026-07-17:** PR #5 integrated the reviewed Academy stack into `main`. Future milestones return to `main` as their canonical base; the active learner-history branch will rebase before its own PR.
 - **2026-07-17:** Roadmap refinement added Active Development, release history, the Git workflow, a media pipeline milestone, and the 4A/4B privacy boundary for learner history.
 - **2026-07-17:** Post-integration review fixes address per-lesson resume persistence, renderer-specific schema validation, and corrective safety-quiz feedback before Milestone 4 resumes.
+- **2026-07-17:** Milestone 4A implemented local-only Academy learner history, optional reflections, local-day activity summaries, export, and deletion. It is intentionally stacked on PR #6 until the review fixes merge.
