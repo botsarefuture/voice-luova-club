@@ -93,6 +93,12 @@ export function validateLesson(lesson) {
     blockIds.add(block.id);
     if (!Number.isInteger(block.version) || block.version < 1) errors.push(`Block ${block.id} needs a positive integer version.`);
     if (!COMPLETION_KINDS.includes(block.completion.kind)) errors.push(`Block ${block.id} has an unsupported completion kind.`);
+    definition?.requiredContent?.forEach((field) => {
+      const value = block.content[field];
+      if (value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) {
+        errors.push(`Block ${block.id} needs content.${field}.`);
+      }
+    });
     block.evidenceRefs.forEach((reference) => {
       if (!evidenceIds.has(reference)) errors.push(`Block ${block.id} references unknown evidence ${reference}.`);
     });

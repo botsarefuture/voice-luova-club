@@ -4,7 +4,7 @@ An open-source, transfemme-focused voice-training practice companion.
 
 Contributions are welcome through issues and pull requests. Read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md) before contributing.
 
-The [Product Vision](docs/product-vision.md) explains the long-term learning experience and non-negotiable product principles. The evidence, safety boundaries, and feature-design principles are public in the [Research and Practice Guide](docs/research-guide.md). It is the source of truth for training-related product changes. The [Implementation Roadmap](docs/roadmap.md) records the active academy milestones, decisions, and known limitations. The [Lesson Engine Architecture](docs/lesson-engine.md) documents the versioned content contract for contributors. The [iOS Readiness Plan](docs/ios-readiness.md) documents the decisions that keep a future native app possible without a rewrite.
+The [Product Vision](docs/product-vision.md) explains the long-term learning experience and non-negotiable product principles. The evidence, safety boundaries, and feature-design principles are public in the [Research and Practice Guide](docs/research-guide.md). It is the source of truth for training-related product changes. The [Implementation Roadmap](docs/roadmap.md) records the active academy milestones, decisions, and known limitations. The [Lesson Engine Architecture](docs/lesson-engine.md) documents the versioned content contract for contributors, and [Foundations Course: First Four Lessons](docs/foundations-lessons.md) documents the first real lesson set. The [iOS Readiness Plan](docs/ios-readiness.md) documents the decisions that keep a future native app possible without a rewrite.
 
 FemmeVoice is released under the [MIT License](LICENSE).
 
@@ -23,7 +23,7 @@ Progress sync stores only app progress data. Audio analysis runs in the browser.
 
 Training includes selectable Starter, Steady, and Deep session tiers, guided hum-to-vowel warmups, adaptive pitch matching, brightness exploration, speech transfer, and rest reminders so users do not overtrain. The pitch ladder begins from an easy detected hum (or a gentle starter note), uses small intervals, and accepts a close, steady match rather than demanding exact cents.
 
-The Academy catalogue is available at `#academy`. Its first release provides a versioned, safety-annotated course map and Foundations seed lessons. The generic player is available as a clearly labelled non-curriculum preview while the Foundations content remains under review; durable academy completion history is planned for a later milestone.
+The Academy catalogue is available at `#academy`. Foundations currently has four short, safety-annotated lessons for newcomers, followed by a clearly marked course map for the remaining reviewed content. The generic player saves a private safe breakpoint locally; durable academy completion history is planned for a later milestone.
 
 The product intentionally does not claim to detect resonance, vocal weight, or vocal health from microphone data. It measures pitch, pitch stability, and level locally in the browser, then presents listening prompts and safe-practice guidance for the rest.
 

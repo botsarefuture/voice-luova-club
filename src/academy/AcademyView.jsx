@@ -1,13 +1,14 @@
 import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, Clock3, ShieldCheck } from "lucide-react";
 import { ACADEMY_COURSES, formatCourseDuration, getAcademyCourse } from "./catalog";
 import LessonPlayer from "./LessonPlayer";
-import { LESSON_PLAYER_PREVIEW } from "./content/lessonPlayerPreview";
+import { getFoundationsLesson } from "./content/foundations";
 
 export default function AcademyView({ courseSlug, lessonSlug, onOpenCourse, onBack }) {
   const course = courseSlug ? getAcademyCourse(courseSlug) : null;
+  const lesson = courseSlug === "foundations" && lessonSlug ? getFoundationsLesson(lessonSlug) : null;
 
-  if (course && lessonSlug === LESSON_PLAYER_PREVIEW.slug) {
-    return <LessonPlayer lesson={LESSON_PLAYER_PREVIEW} onExit={() => onOpenCourse(course.slug)} />;
+  if (course && lesson) {
+    return <LessonPlayer key={`${lesson.id}:${lesson.version}`} lesson={lesson} courseTitle={course.title} onExit={() => onOpenCourse(course.slug)} />;
   }
 
   if (course && lessonSlug) {
@@ -20,12 +21,12 @@ export default function AcademyView({ courseSlug, lessonSlug, onOpenCourse, onBa
         <p className="eyebrow">Academy</p>
         <h2 id="academy-not-found-title">That course is not available.</h2>
         <p>It may have moved, or the link may be incomplete. The Academy home has the current course map.</p>
-        <button className="auth-action" onClick={onBack}><ArrowLeft /> Academy home</button>
+        <button type="button" className="auth-action" onClick={onBack}><ArrowLeft /> Academy home</button>
       </section>
     );
   }
 
-  if (course) return <CourseOverview course={course} onBack={onBack} onOpenPreview={() => onOpenCourse(course.slug, LESSON_PLAYER_PREVIEW.slug)} />;
+  if (course) return <CourseOverview course={course} onBack={onBack} onOpenLesson={(nextLessonSlug) => onOpenCourse(course.slug, nextLessonSlug)} />;
 
   return (
     <section className="academy-page" aria-labelledby="academy-title">
@@ -47,7 +48,7 @@ export default function AcademyView({ courseSlug, lessonSlug, onOpenCourse, onBa
       <section className="academy-catalogue" aria-label="Academy courses">
         {ACADEMY_COURSES.map((item) => (
           <article className={`academy-course academy-course-${item.status}`} key={item.slug}>
-            <div className="academy-course-topline"><p className="eyebrow">{item.eyebrow}</p><span>{item.status === "in-development" ? "Course map" : "Planned"}</span></div>
+            <div className="academy-course-topline"><p className="eyebrow">{item.eyebrow}</p><span>{item.status === "available" ? "Ready" : "Planned"}</span></div>
             <h3>{item.title}</h3>
             <p>{item.summary}</p>
             <dl>
@@ -55,8 +56,8 @@ export default function AcademyView({ courseSlug, lessonSlug, onOpenCourse, onBa
               <div><dt>Learning time</dt><dd>{formatCourseDuration(item.estimatedMinutes)}</dd></div>
               <div><dt>Evidence</dt><dd>{item.evidenceLevel}</dd></div>
             </dl>
-            {item.status === "in-development" ? (
-              <button className="primary-action" onClick={() => onOpenCourse(item.slug)}>Explore Foundations <ArrowRight /></button>
+            {item.status === "available" ? (
+              <button type="button" className="primary-action" onClick={() => onOpenCourse(item.slug)}>Start Foundations <ArrowRight /></button>
             ) : (
               <p className="academy-coming-soon">This course will appear here when its lessons have been reviewed.</p>
             )}
@@ -72,10 +73,10 @@ export default function AcademyView({ courseSlug, lessonSlug, onOpenCourse, onBa
   );
 }
 
-function CourseOverview({ course, onBack, onOpenPreview }) {
+function CourseOverview({ course, onBack, onOpenLesson }) {
   return (
     <section className="academy-page academy-course-page" aria-labelledby="academy-course-title">
-      <button className="academy-back" onClick={onBack}><ArrowLeft /> Academy home</button>
+      <button type="button" className="academy-back" onClick={onBack}><ArrowLeft /> Academy home</button>
       <header className="academy-heading academy-course-heading">
         <div>
           <p className="eyebrow">{course.eyebrow}</p>
@@ -88,24 +89,19 @@ function CourseOverview({ course, onBack, onOpenPreview }) {
       <aside className="academy-safety-note"><ShieldCheck aria-hidden="true" /><div><strong>Comfort-first course</strong><p>{course.safetyNote}</p></div></aside>
 
       <section className="academy-lesson-map" aria-labelledby="academy-lesson-map-title">
-        <div><p className="eyebrow">Course map</p><h3 id="academy-lesson-map-title">The first three lessons are taking shape.</h3><p>The lesson player arrives in the next milestone. This preview makes the curriculum and its intentions visible before it asks anyone to practise.</p></div>
+        <div><p className="eyebrow">Start here</p><h3 id="academy-lesson-map-title">Four gentle lessons are ready when you are.</h3><p>Each one is short, saves a safe place to return to, and works without a microphone or recording.</p></div>
         <ol>
           {course.lessons.map((lesson, index) => (
             <li key={lesson.slug}>
               <span>{index + 1}</span>
               <div><strong>{lesson.title}</strong><p>{lesson.objective}</p><small>{lesson.durationMinutes} min guided learning</small></div>
-              <em>In development</em>
+              {lesson.status === "available" ? <button type="button" className="academy-lesson-start" aria-label={`Start ${lesson.title}`} onClick={() => onOpenLesson(lesson.slug)}>Start <ArrowRight /></button> : <em>In review</em>}
             </li>
           ))}
           {Array.from({ length: Math.max(0, course.lessonCount - course.lessons.length) }, (_, index) => (
             <li className="academy-lesson-future" key={`future-${index}`}><span>{course.lessons.length + index + 1}</span><div><strong>Lesson in review</strong><p>Content, evidence, safety, and accessibility review come before release.</p></div></li>
           ))}
         </ol>
-      </section>
-
-      <section className="academy-player-preview" aria-labelledby="academy-player-preview-title">
-        <div><p className="eyebrow">Technical preview</p><h3 id="academy-player-preview-title">See the learning format before course content arrives.</h3><p>This five-minute example tests the generic player only. It is not a Foundations lesson and does not ask you to practise or record.</p></div>
-        <button type="button" className="secondary-action" onClick={onOpenPreview}>Open lesson player preview <ArrowRight /></button>
       </section>
 
       <aside className="academy-transparency" aria-label="Course evidence">

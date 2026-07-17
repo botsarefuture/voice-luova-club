@@ -24,7 +24,7 @@ The schema uses safe structured rich text nodes. It deliberately does not render
 
 The current types are text, rich text, image, video, audio, reflection, quiz, interactive exercise, reading passage, conversation prompt, recording activity, resource download, checkpoint, and `Why this?` evidence panel. Lesson metadata reserves `programId`, `pathIds`, and `unitId` so future programs can use the same player without changing the lesson contract.
 
-Media must include a transcript; video also requires captions; images require alternative text. Image, audio, and video load failures show the same accessible alternative rather than leaving an empty or broken control. Recording blocks must always expose a no-recording route. These checks deliberately fail closed in the player.
+Media must include a transcript; video also requires captions; images require alternative text. The registry also declares renderer-required `content` fields, such as a reflection prompt or reading passage; validation rejects a missing field before it can render as a blank blocked step. Image, audio, and video load failures show the same accessible alternative rather than leaving an empty or broken control. Recording blocks must always expose a no-recording route. These checks deliberately fail closed in the player.
 
 ## Evidence And Safety
 
@@ -41,11 +41,13 @@ Completion rules are deliberately participation-based:
 
 `src/academy/lessonProgress.js` stores only the current safe block index and completed block ids in the separate local key `femmevoice:academy:lesson-resume`. It is version-scoped and never touches `voice-training:progress`, the existing account-sync contract. It records no reflection text, quiz answer, recording, microphone data, or analytics event.
 
+`createLessonProgress(lesson, state)` is the sole projection for learner-facing progress, resume, and future analytics. It derives the current step, completed blocks, `percentage` (position including the active step), `completionPercentage` (finished blocks), and `isComplete` from one serializable state object. The visible progress bar and step label both use the position value, so “Step 3 of 5” is always 60%. Completion remains a separate, explicitly named analytic value rather than a competing UI calculation.
+
 Milestone 3 will replace this single-preview resume store with a durable, exportable learner progress model and explicit account synchronization. It must preserve the same version boundary.
 
 ## Routing
 
-Academy routes are `#academy`, `#academy/:courseSlug`, and `#academy/:courseSlug/:lessonSlug`. Segments are URI-encoded on creation and decoded defensively when read. The engine preview route exists solely to validate the player; it is labelled as non-curriculum content and is not a Foundations lesson.
+Academy routes are `#academy`, `#academy/:courseSlug`, and `#academy/:courseSlug/:lessonSlug`. Segments are URI-encoded on creation and decoded defensively when read. The engine preview remains a test fixture; public lesson routes resolve reviewed course content rather than technical demo material.
 
 ## Accessibility
 
@@ -53,4 +55,4 @@ The player uses semantic headings, labelled progress, visible controls, native m
 
 ## Content Revision Policy
 
-Published content must be immutable by `id` + `version`. A material change creates a new version and keeps its previous version reference for audit and learner-resume decisions. The current static preview is an implementation fixture, not published curriculum. Server-side draft/publish/review work is intentionally deferred to Milestone 6.
+Published content must be immutable by `id` + `version`. A material change creates a new version and keeps its previous version reference for audit and learner-resume decisions. The current static preview is an implementation fixture, and the first reviewed Foundations lessons are documented in [Foundations Course: First Four Lessons](foundations-lessons.md). Server-side draft/publish/review work is intentionally deferred to Milestone 6.

@@ -2,7 +2,7 @@
 
 **Status:** living implementation guide  
 **Last updated:** 17 July 2026  
-**Current development phase:** Milestone 2 - Versioned Lesson Engine, ready for review
+**Current development phase:** Milestone 3 - Foundations Course, ready for review
 
 ## Vision
 
@@ -14,7 +14,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 
 - Existing guided practice, local-first pitch analysis, encrypted opt-in recordings, account sync, reminders, progress history, research guide, and feedback inbox are live.
 - The existing app is a React/Vite single-page application with hash navigation. Flask/MongoDB provides accounts, progress sync, encrypted recording storage, reminders, and administrative feedback.
-- Academy catalogue routing, course-overview seed content, and a generic versioned lesson-player preview are implemented. Academy learner history/account sync and authoring are not yet implemented.
+- Academy catalogue routing, a generic versioned lesson player, and the first four Foundations lessons are implemented. Academy learner history/account sync and authoring are not yet implemented.
 
 ## Architecture Decisions
 
@@ -28,6 +28,9 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 | 2026-07-17 | Use a schema-first lesson boundary with safe structured rich text. | Keep authored HTML out of the player and give future CMS revisions one validation contract. |
 | 2026-07-17 | Keep early Academy resume data in a separate, local, version-scoped key. | Prove safe-breakpoint behaviour without modifying legacy synced practice progress or collecting learner content. |
 | 2026-07-17 | Ship a clearly labelled engine preview, not Foundations course material. | Validate the player while preserving the planned curriculum review and publication process. |
+| 2026-07-17 | Move Foundations content validation ahead of the broad learner-history system. | Real lessons are the fastest way to prove or refine the engine; durable sync remains a separate privacy-sensitive milestone. |
+| 2026-07-17 | Derive all lesson progress from `createLessonProgress`. | Keep the progress bar, step text, resume state, completion, and future analytics from drifting apart. |
+| 2026-07-17 | Validate type-specific block content in the schema. | Real lesson authoring exposed that generic metadata alone cannot prevent a blank, blocked renderer. |
 
 ## Milestones
 
@@ -46,7 +49,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 
 ### Milestone 1 - Academy Foundation
 
-**Status:** 👀 Ready for Review (100%)
+**Status:** ✅ Completed
 **Goal:** Make Academy a first-class, usable FemmeVoice destination without changing existing practice behaviour.  
 **Complexity:** Medium  
 **Dependencies:** Milestone 0
@@ -74,7 +77,7 @@ Create hash routes, a navigation entry, a static course catalogue, course/lesson
 
 **Known limitations**
 - Course content is seed content, not the complete Foundations course.
-- Completion/resume persistence is deferred to Milestone 3.
+- Durable completion/resume persistence is deferred to Milestone 4.
 - No server schema or author interface is introduced in this milestone.
 
 ### Milestone 2 - Versioned Lesson Engine
@@ -93,7 +96,7 @@ Create hash routes, a navigation entry, a static course catalogue, course/lesson
 
 **Completed**
 - [x] Added a versioned schema, block registry, validation, and safe rich-text structure.
-- [x] Added a responsive, keyboard-operable lesson player with pause, progress, completion rules, and a non-curriculum preview route.
+- [x] Added a responsive, keyboard-operable lesson player with pause, progress, completion rules, and a non-curriculum preview fixture.
 - [x] Added a local-only, version-scoped safe-breakpoint adapter that does not touch existing synced practice progress.
 - [x] Added a contributor architecture guide and schema/rendering/resume tests.
 
@@ -103,12 +106,35 @@ Create hash routes, a navigation entry, a static course catalogue, course/lesson
 - The player exposes a recording block and no-recording route; a reusable encrypted recording-provider adapter is deferred until learner progress and content requirements are settled.
 - Translation links and revision lineage exist in the contract; authoring, translation workflow, and publishing enforcement are Milestone 6 work.
 
-### Milestone 3 - Learner Progress
+### Milestone 3 - Foundations Course
+
+**Status:** 👀 Ready for Review (100%)
+**Goal:** Validate the lesson engine through a polished, research-literate opening experience before expanding the curriculum.
+**Complexity:** High
+**Dependencies:** Milestone 2 and content review
+
+**Completed**
+- [x] Author four opening lessons: welcome, safety/privacy, how voice learning works, and first gentle exploration.
+- [x] Add per-lesson safety, evidence, accessibility, metadata, checkpoints, and completion messages.
+- [x] Add a simplified pathway illustration and a labelled accessible audio placeholder.
+- [x] Verify real lesson routes, resume, browser keyboard navigation, and mobile presentation.
+- [x] Fix the progress-model inconsistency discovered during content validation.
+
+**Review focus**
+- [ ] Content/research review of the initial lesson wording and evidence labels.
+- [ ] Review the implementation screenshots and focused pull request.
+
+**Known limitations**
+- The first four lessons validate the engine; the remaining eight Foundations lessons remain in review.
+- The audio example is an explicitly labelled placeholder with a transcript, not production instructional media.
+- The generated pathway illustration is a non-diagnostic orientation aid and needs replacement only through normal content review.
+
+### Milestone 4 - Learner Progress
 
 **Status:** ⏳ Planned  
 **Goal:** Keep academy learning state private, durable, and separate from legacy practice history.  
 **Complexity:** High  
-**Dependencies:** Milestone 2
+**Dependencies:** Milestones 2-3
 
 **Acceptance criteria**
 - [ ] Expand the M2 safe-breakpoint adapter into durable local lesson completion, activity time, reflection, and a private skill ledger.
@@ -116,12 +142,12 @@ Create hash routes, a navigation entry, a static course catalogue, course/lesson
 - [ ] Export/deletion covers academy data.
 - [ ] Existing `progress` version 1 remains readable and untouched.
 
-### Milestone 4 - Transparent Coach
+### Milestone 5 - Transparent Coach
 
 **Status:** ⏳ Planned  
 **Goal:** Recommend a kind next session using visible, overrideable rules.  
 **Complexity:** Medium  
-**Dependencies:** Milestones 2-3
+**Dependencies:** Milestones 3-4
 
 **Acceptance criteria**
 - [ ] User-controlled time, path, confidence/ease, and recent-practice inputs.
@@ -129,25 +155,12 @@ Create hash routes, a navigation entry, a static course catalogue, course/lesson
 - [ ] Review, recovery, low-energy, and plateau paths are available.
 - [ ] No opaque AI, gender scoring, diagnosis, or punishment mechanics.
 
-### Milestone 5 - Foundations Course
-
-**Status:** ⏳ Planned  
-**Goal:** Deliver the reviewed beginner course through the lesson engine.  
-**Complexity:** High  
-**Dependencies:** Milestones 2-4 and content review
-
-**Acceptance criteria**
-- [ ] Complete foundation curriculum with learning objective, warmup, practice, reflection, cooldown, homework, and safety content.
-- [ ] Every recommendation and exercise claim links to evidence/limits.
-- [ ] Mobile, keyboard, screen-reader, media, and privacy checks pass.
-- [ ] Content review sign-off is recorded.
-
 ### Milestone 6 - Content Operations
 
 **Status:** ⏳ Planned  
 **Goal:** Let authorized contributors create, review, version, and publish academy content.  
 **Complexity:** High  
-**Dependencies:** Milestones 2-5
+**Dependencies:** Milestones 2-3
 
 **Acceptance criteria**
 - [ ] Structured course/lesson/block editing, draft/preview/publish, audit history, and rollback.
@@ -159,7 +172,7 @@ Create hash routes, a navigation entry, a static course catalogue, course/lesson
 
 - `src/App.jsx` owns much of the current UI and practice orchestration. New academy code must stay outside it; extracting existing practice state requires dedicated tests before it moves.
 - Existing cloud sync stores a version-1 progress blob. Academy data needs separate collections and APIs rather than silently changing that contract.
-- The M2 preview uses local browser storage only. Milestone 3 must define migration, retention, export, deletion, multi-device conflict handling, and explicit sync consent before persisting richer academy state.
+- The lesson player uses local browser storage only. Milestone 4 must define migration, retention, export, deletion, multi-device conflict handling, and explicit sync consent before persisting richer academy state.
 - Public media needs a storage/CDN strategy; do not put large course video into the existing encrypted-recording vault.
 - Lesson authoring must enforce captions, transcripts, evidence, and safety metadata, or content quality will drift.
 - Community features require funded human moderation and safeguarding; they are not a learner MVP dependency.
@@ -178,3 +191,6 @@ Create hash routes, a navigation entry, a static course catalogue, course/lesson
 - **2026-07-17:** Roadmap created; Academy Foundation implemented and submitted for review. It adds hash routes, a versioned static catalogue, course-overview seed content, focused tests, and responsive UI. Learner progress is explicitly deferred to Milestone 3.
 - **2026-07-17:** Milestone 1 self-review extended Academy routes to `#academy/:courseSlug/:lessonSlug`, with defensive decoding. The change is included in its review PR.
 - **2026-07-17:** Milestone 2 implemented and submitted for review. It adds the generic versioned schema, registry, accessible lesson player, privacy-minimal safe-breakpoint preview state, developer architecture guide, and renderer/schema/resume tests. No Foundations curriculum, cloud sync, or authoring was added.
+- **2026-07-17:** Milestone 1 merged to `main`. The roadmap sequence was updated to validate Foundations content before the broader learner-progress system.
+- **2026-07-17:** The first four Foundations lessons were implemented using the generic engine. Content validation exposed a mixed progress calculation; `createLessonProgress` now provides the single source of truth for visible progress, completion, resume, and future analytics.
+- **2026-07-17:** Real lesson authoring exposed missing type-specific content validation. The schema now rejects incomplete renderer content, preventing blank, blocked lesson steps.
