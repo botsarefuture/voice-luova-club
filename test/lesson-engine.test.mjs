@@ -28,6 +28,15 @@ test("the first Foundations lessons are complete, versioned learning documents",
   assert.equal(getFoundationsLesson("not-a-lesson"), null);
 });
 
+test("Foundations reflections keep low-energy and uncertain answers valid", () => {
+  const reflections = FOUNDATIONS_LESSONS.flatMap((lesson) => lesson.blocks.filter((block) => block.type === "reflection"));
+  assert.ok(reflections.length >= 2);
+  for (const reflection of reflections) {
+    assert.equal(reflection.completion.minLength, 1);
+    assert.equal(canCompleteBlock(reflection, { text: "?" }), true);
+  }
+});
+
 test("block registry covers every supported renderer and declares media accessibility requirements", () => {
   assert.deepEqual(Object.keys(Object.fromEntries(BLOCK_TYPES.map((type) => [type, getBlockDefinition(type)]))), BLOCK_TYPES);
   assert.equal(getBlockDefinition("video").requiresCaptions, true);

@@ -2,7 +2,7 @@
 
 **Status:** living implementation guide  
 **Last updated:** 17 July 2026  
-**Current development phase:** Milestone 3 - Foundations Course, ready for review
+**Current development phase:** Academy Polish - ready for review
 
 ## Vision
 
@@ -31,6 +31,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 | 2026-07-17 | Move Foundations content validation ahead of the broad learner-history system. | Real lessons are the fastest way to prove or refine the engine; durable sync remains a separate privacy-sensitive milestone. |
 | 2026-07-17 | Derive all lesson progress from `createLessonProgress`. | Keep the progress bar, step text, resume state, completion, and future analytics from drifting apart. |
 | 2026-07-17 | Validate type-specific block content in the schema. | Real lesson authoring exposed that generic metadata alone cannot prevent a blank, blocked renderer. |
+| 2026-07-17 | Keep Academy polish focused on clarity, accessibility, and truthful content. | Larger learner-history, media, and coaching changes need their own reviewable milestones. |
 
 ## Milestones
 
@@ -129,6 +130,40 @@ Create hash routes, a navigation entry, a static course catalogue, course/lesson
 - The audio example is an explicitly labelled placeholder with a transcript, not production instructional media.
 - The generated pathway illustration is a non-diagnostic orientation aid and needs replacement only through normal content review.
 
+### Academy Polish
+
+**Status:** 👀 Ready for Review (100%)
+**Goal:** Make the first Academy experience calmer, more accessible, and more truthful before widening the curriculum.
+**Complexity:** Low
+**Dependencies:** Milestone 3
+
+**Completed**
+- [x] Review the Academy through first-time, nervous-learner, ADHD, mobile-only, screen-reader, and contributor lenses.
+- [x] Give lesson entry and completion intentional keyboard/screen-reader focus targets.
+- [x] Expand Academy navigation and start controls to 44px touch targets.
+- [x] Honor reduced-motion preferences for progress updates.
+- [x] Remove a preview-only style that no longer had a live surface.
+- [x] Revise safety wording so it describes routes the player actually provides.
+- [x] Accept minimal reflection responses so uncertainty is not treated as non-participation.
+
+**Acceptance criteria**
+- [x] The Academy remains a single-task-at-a-time experience with a visible exit and safety route.
+- [x] Lesson entry, completion, visible step state, and assistive-technology announcements stay coherent.
+- [x] Mobile controls meet a 44px minimum target size.
+- [x] No architecture, schema, or learner-data expansion is introduced.
+
+## Immediate Improvements
+
+- Complete expert content and evidence review before publishing additional Foundations lessons.
+- Replace the labelled audio placeholder with a captioned, transcribed instructional example that has passed content review.
+- Conduct manual VoiceOver, TalkBack, and Safari/iOS checks with real assistive-technology users before public Academy launch.
+
+## Nice-to-have Improvements
+
+- Offer a low-stimulation display preference beyond the system reduced-motion setting.
+- Add a course-level completion moment and a clear, non-guilting next-session recommendation after learner history exists.
+- Add a visible lesson-duration total that updates for optional blocks once authored content needs it.
+
 ### Milestone 4 - Learner Progress
 
 **Status:** ⏳ Planned  
@@ -177,6 +212,8 @@ Create hash routes, a navigation entry, a static course catalogue, course/lesson
 - Lesson authoring must enforce captions, transcripts, evidence, and safety metadata, or content quality will drift.
 - Community features require funded human moderation and safeguarding; they are not a learner MVP dependency.
 - Native iOS work depends on later API-token and audio-provider boundaries described in the iOS readiness plan.
+- The static Academy has no loading state because no Academy content is fetched yet. Add loading, retry, and offline states together with the first remote-content API rather than inventing them for synchronous seed content.
+- The pause control pauses lesson navigation, not embedded media. Define one consistent media-session contract before production video/audio ships.
 
 ## Future Ideas
 
@@ -194,3 +231,4 @@ Create hash routes, a navigation entry, a static course catalogue, course/lesson
 - **2026-07-17:** Milestone 1 merged to `main`. The roadmap sequence was updated to validate Foundations content before the broader learner-progress system.
 - **2026-07-17:** The first four Foundations lessons were implemented using the generic engine. Content validation exposed a mixed progress calculation; `createLessonProgress` now provides the single source of truth for visible progress, completion, resume, and future analytics.
 - **2026-07-17:** Real lesson authoring exposed missing type-specific content validation. The schema now rejects incomplete renderer content, preventing blank, blocked lesson steps.
+- **2026-07-17:** Academy Polish pass completed. It improves focus management, mobile touch targets, reduced-motion behaviour, low-pressure reflection completion, and content accuracy without expanding the lesson engine or learner-data surface.

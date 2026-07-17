@@ -10,7 +10,7 @@ const COMMON_METADATA = {
 const COMMON_SAFETY = {
   note: "Nothing here needs to be pushed, held, recorded, or completed perfectly.",
   stopSignals: ["pain", "persistent hoarseness", "unusual fatigue", "difficulty breathing or swallowing"],
-  lowerIntensityAlternative: "You can read, listen, skip a step, or stop for today. The lesson still counts as yours.",
+  lowerIntensityAlternative: "You can choose the listening-only route, repeat an easier activity, or stop for today. The lesson still counts as yours.",
 };
 
 const VOICE_HEALTH_EVIDENCE = {
@@ -67,7 +67,7 @@ export const FOUNDATIONS_LESSONS = [
           paragraph("You can use the microphone later, or never. You can pause halfway through. A quiet, curious start is enough."),
         ],
       }, ["goal-led-communication"]),
-      block("choose-a-direction", "reflection", "Choose", "What would you like to have more of in your voice or communication?", 2, { kind: "response", minLength: 2 }, { prompt: "What would you like to have more of in your voice or communication?" }, []),
+      block("choose-a-direction", "reflection", "Choose", "What would you like to have more of in your voice or communication?", 2, { kind: "response", minLength: 1 }, { prompt: "What would you like to have more of in your voice or communication? A few words are enough; “not sure” is welcome." }, []),
       block("what-to-expect", "text", "Understand", "What FemmeVoice can and cannot do", 1, { kind: "manual" }, {
         text: "This app can help you notice limited sound information, such as pitch and steadiness when you choose to use a microphone. It cannot tell whether a voice is feminine, healthy, authentic, or right for you. You decide what feels comfortable and worth keeping.",
       }, ["goal-led-communication"]),
@@ -190,7 +190,7 @@ export const FOUNDATIONS_LESSONS = [
       block("conversation-choice", "conversation_prompt", "Optional context", "A private phrase for real life", 1, { kind: "manual" }, {
         prompt: "Optional: type a short phrase you might use in a message, call, game, or quiet moment. You do not need to say it aloud today.",
       }),
-      block("ease-reflection", "reflection", "Reflect", "How did that route feel? You can write “easy”, “unsure”, “not today”, or anything else.", 2, { kind: "response", minLength: 2 }, { prompt: "How did that route feel? You can write “easy”, “unsure”, “not today”, or anything else." }, ["voice-health"]),
+      block("ease-reflection", "reflection", "Reflect", "How did that route feel? You can write “easy”, “unsure”, “not today”, or anything else.", 2, { kind: "response", minLength: 1 }, { prompt: "How did that route feel? You can write “easy”, “unsure”, “not today”, or anything else." }, ["voice-health"]),
       block("first-sound-why", "why_this", "Why this?", "Why stop while it feels easy?", 1, { kind: "optional" }, {
         prompt: "Short, self-regulated experiments reduce pressure and leave room to notice comfort. FemmeVoice does not claim that one sound changes a voice.",
       }, ["voice-health", "multidimensional-voice"]),

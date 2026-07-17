@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, CheckCircle2, CirclePause, Play, ShieldCheck } from "lucide-react";
 import { BlockRenderer } from "./BlockRenderer";
 import { advanceLessonProgress, canCompleteBlock, createLessonProgress, createLessonResumeStore, moveLessonProgress } from "./lessonProgress";
@@ -12,6 +12,8 @@ export default function LessonPlayer({ lesson: lessonSource, courseTitle = "Acad
   const [responses, setResponses] = useState({});
   const [paused, setPaused] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const lessonHeadingRef = useRef(null);
+  const completionHeadingRef = useRef(null);
 
   useEffect(() => {
     setHydrated(false);
@@ -30,6 +32,14 @@ export default function LessonPlayer({ lesson: lessonSource, courseTitle = "Acad
   const currentBlock = lesson.blocks[progress.blockIndex];
   const response = responses[currentBlock?.id] ?? {};
   const canContinue = currentBlock ? canCompleteBlock(currentBlock, response) : false;
+
+  useEffect(() => {
+    if (hydrated && !progress.isComplete) lessonHeadingRef.current?.focus({ preventScroll: true });
+  }, [hydrated, lesson.id, lesson.version, progress.isComplete]);
+
+  useEffect(() => {
+    if (hydrated && progress.isComplete) completionHeadingRef.current?.focus({ preventScroll: true });
+  }, [hydrated, progress.isComplete]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -56,14 +66,14 @@ export default function LessonPlayer({ lesson: lessonSource, courseTitle = "Acad
   }
 
   if (progress.isComplete) {
-    return <section className="lesson-player lesson-complete" aria-labelledby="lesson-complete-title"><CheckCircle2 aria-hidden="true" /><p className="eyebrow">Lesson complete</p><h2 id="lesson-complete-title">{lesson.metadata.completionMessage ?? "You reached the end of this lesson."}</h2><p>You can return to the course now, or take a break. Nothing needs to be repeated today.</p><button type="button" className="auth-action" onClick={onExit}><ArrowLeft /> Back to {courseTitle}</button></section>;
+    return <section className="lesson-player lesson-complete" aria-labelledby="lesson-complete-title"><CheckCircle2 aria-hidden="true" /><p className="eyebrow">Lesson complete</p><h2 id="lesson-complete-title" ref={completionHeadingRef} tabIndex="-1">{lesson.metadata.completionMessage ?? "You reached the end of this lesson."}</h2><p>You can return to the course now, or take a break. Nothing needs to be repeated today.</p><button type="button" className="auth-action" onClick={onExit}><ArrowLeft /> Back to {courseTitle}</button></section>;
   }
 
   return <section className="lesson-player" aria-labelledby="lesson-player-title" tabIndex="-1">
     <header className="lesson-player-header">
       <button type="button" className="academy-back" onClick={onExit}><ArrowLeft /> Back to {courseTitle}</button>
       <p className="eyebrow">{courseTitle}</p>
-      <h2 id="lesson-player-title">{lesson.title}</h2>
+      <h2 id="lesson-player-title" ref={lessonHeadingRef} tabIndex="-1">{lesson.title}</h2>
       <p>{lesson.objective}</p>
       <div className="lesson-progress-row"><div className="lesson-progress" role="progressbar" aria-label="Lesson progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progress.percentage} aria-valuetext={`Step ${progress.currentBlock} of ${progress.totalBlocks}`}><span style={{ width: `${progress.percentage}%` }} /></div><span>Step {progress.currentBlock} of {progress.totalBlocks}</span></div>
     </header>
@@ -80,7 +90,7 @@ export default function LessonPlayer({ lesson: lessonSource, courseTitle = "Acad
 }
 
 function completionHint(block) {
-  if (block.completion.kind === "response") return "Add a short reflection to continue, or go back if you want to change your answer.";
+  if (block.completion.kind === "response") return "Add a reflection to continue, or go back if you want to change your answer.";
   if (block.completion.kind === "quiz") return "Choose an answer to continue.";
   if (block.completion.kind === "activity") return "Mark the activity as tried to continue.";
   return "This step is not ready to continue yet.";
