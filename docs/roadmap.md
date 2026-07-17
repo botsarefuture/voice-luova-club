@@ -8,12 +8,12 @@
 
 | Item | Current state |
 | --- | --- |
-| Current milestone | Milestone 5D - Course editor and ordering, ready for review |
-| Current version | `v0.3.21` |
-| Current working branch | `feat/academy-course-management` |
-| Active pull request(s) | Course-management PR pending. PR #10 is integrated into `main`. |
+| Current milestone | Milestone 5E - Structured lesson forms, in progress |
+| Current version | `v0.3.22` |
+| Current working branch | `feat/academy-lesson-forms` |
+| Active pull request(s) | Structured-lesson-forms PR in preparation. PRs #9-#11 are integrated into `main`. |
 | Base branch | `main` is canonical. |
-| Next planned milestone | Interactive-practice architecture research and remaining Admin Academy workflow |
+| Next planned milestone | Course forms and ordering, then review/publish controls and Foundations migration |
 | Overall completion estimate | About 30% of the long-term Academy vision; the core engine is complete, while history, authoring, media, curriculum, and coaching remain substantial work. |
 
 ## Vision
@@ -26,7 +26,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 
 - Existing guided practice, local-first pitch analysis, encrypted opt-in recordings, account sync, reminders, progress history, research guide, and feedback inbox are live.
 - The existing app is a React/Vite single-page application with hash navigation. Flask/MongoDB provides accounts, progress sync, encrypted recording storage, reminders, and administrative feedback.
-- Academy catalogue routing, the generic versioned lesson player, a production-quality four-lesson Foundations slice, and its polish review are complete. Academy learner history/account sync and authoring are not yet implemented.
+- Academy catalogue routing, the generic versioned lesson player, a production-quality four-lesson Foundations slice, learner history/account sync, and the initial governed Admin Academy are complete. Milestone 5 is replacing the remaining raw-document authoring paths with practical forms and workflows.
 
 ## Release History
 
@@ -45,6 +45,7 @@ The definitive product direction is the [Product Vision](product-vision.md). Voi
 - `v0.3.19` - Academy authoring PR readiness
 - `v0.3.20` - Academy block authoring controls
 - `v0.3.21` - Academy course management
+- `v0.3.22` - Structured lesson authoring forms
 
 Update this list whenever a versioned change is pushed so milestones, pull requests, and releases remain easy to correlate.
 
@@ -89,6 +90,7 @@ This keeps history understandable without forcing unrelated work into a prematur
 | 2026-07-17 | Move content operations ahead of the transparent coach. | A larger curriculum needs consistent authoring, review, and publishing before recommendations can responsibly point learners to more content. |
 | 2026-07-17 | Treat the first four Foundations lessons as an MVP slice, not the complete course. | Remaining lessons will follow after learner history and content operations are established. |
 | 2026-07-17 | Keep Academy learner history local and separate from legacy practice progress. | It gives learners useful reflection and deletion/export controls without silently expanding account data collection. |
+| 2026-07-17 | Make structured forms the normal lesson-authoring route; retain raw lesson JSON only as an advanced escape hatch. | It makes routine editing safer and more approachable without creating a second content schema or blocking carefully reviewed low-level changes. |
 
 ## Milestones
 
@@ -276,10 +278,15 @@ The generic engine is complete and has been validated with real, production-qual
 **Dependencies:** Milestones 2-4
 
 **Acceptance criteria**
-- [ ] Course and lesson management, structured block editing, draft/preview/publish workflow, and version history.
-- [ ] Citation, safety, accessibility, and translation metadata are first-class authoring requirements.
-- [ ] Distinct author, reviewer, publisher, and administrator permissions.
-- [ ] A clean editing workflow before any drag-and-drop builder.
+- [ ] A contributor can create, edit, order, preview, draft, review, publish, and browse revisions for courses and lessons without editing application code.
+- [ ] Every supported lesson block has a purpose-built, keyboard-accessible editing route; raw document editing is an escape hatch, not the normal workflow.
+- [ ] Accessibility metadata, evidence references, and future-ready translation links are first-class authoring requirements.
+- [ ] Distinct author, reviewer, publisher, and administrator permissions are enforced.
+- [ ] The complete Foundations course can be maintained through Admin Academy and serves as the practical validation target.
+
+**Definition of done**
+
+Milestone 5 ends when a contributor can comfortably maintain the complete Foundations curriculum through the Admin Academy: course metadata and ordering, lesson metadata and ordering, every supported block, draft/review/publish workflow, revision browsing, accessibility metadata, and research references. New editor features after that point need a demonstrated authoring need; they do not extend this milestone by default.
 
 #### Milestone 5A - Content Governance API
 
@@ -294,7 +301,7 @@ The generic engine is complete and has been validated with real, production-qual
 
 #### Milestone 5B - Accessible Admin Workspace
 
-**Status:** 👀 Ready for Review
+**Status:** ✅ Completed
 **Goal:** Build a structured authoring and preview interface against the governance API, without a drag-and-drop builder.
 
 **Dependencies:** Milestone 5A
@@ -306,7 +313,7 @@ The generic engine is complete and has been validated with real, production-qual
 
 #### Milestone 5C - Block Authoring Controls
 
-**Status:** 👀 Ready for Review
+**Status:** ✅ Completed
 **Goal:** Add safe, keyboard-friendly block creation and ordering around the real lesson document without creating a second editor schema.
 
 **Dependencies:** Milestone 5B
@@ -318,7 +325,7 @@ The generic engine is complete and has been validated with real, production-qual
 
 #### Milestone 5D - Course Editor And Ordering
 
-**Status:** 👀 Ready for Review
+**Status:** ✅ Completed
 **Goal:** Add course metadata and lesson ordering after block controls have been proven against real Foundations content.
 
 **Dependencies:** Milestone 5C
@@ -327,6 +334,24 @@ The generic engine is complete and has been validated with real, production-qual
 - [x] Separate, validated course draft contract with ordered unique lesson references.
 - [x] Course metadata includes summary, locale, estimated minutes, tags, and future-ready prerequisites.
 - [x] Admin workspace can seed and save the real Foundations course and its current lesson order.
+
+#### Milestone 5E - Structured Lesson Forms
+
+**Status:** 🚧 In Progress
+**Goal:** Make normal lesson authoring possible without editing raw JSON, using the real Foundations lessons as the fixture.
+
+**Dependencies:** Milestones 5A-5C
+
+**Delivered in this slice**
+- [x] Lesson metadata, safety, accessibility, evidence, and translation-reference forms.
+- [x] Purpose-built, keyboard-accessible editing controls for every current lesson block type.
+- [x] Inline block reordering and a learner-player preview continue to use the canonical lesson schema.
+- [x] Raw structured documents are hidden behind an explicitly labelled advanced escape hatch.
+
+**Remaining**
+- [ ] Move the course editor from raw JSON to practical metadata and ordering forms.
+- [ ] Add authoring controls for review submission, review decisions, publishing, and revision comparison.
+- [ ] Use the full workflow to migrate and maintain the complete Foundations curriculum.
 
 ### Milestone 6 - Educational Media Pipeline
 
@@ -426,3 +451,4 @@ The generic engine is complete and has been validated with real, production-qual
 - **2026-07-17:** Milestone 5B adds a role-gated revision workspace that seeds, validates, saves, and previews the real Foundations welcome lesson. Course and block forms are intentionally a follow-up usability slice, not a rushed drag-and-drop editor.
 - **2026-07-17:** Milestone 5C adds small block controls directly around the real Foundations lesson document. This keeps block ordering accessible and schema-backed, while course editing remains a separate focused PR.
 - **2026-07-17:** Milestone 5D adds a validated course draft contract and seeds the real Foundations path through the Admin Academy. Interactive practice remains research/design work until the authoring workflow is reviewed.
+- **2026-07-17:** Milestone 5E begins the normal-form authoring path. Lesson details, research evidence, safety/accessibility notes, translation references, and every existing block type are editable through structured controls; the canonical raw document remains an advanced escape hatch only.

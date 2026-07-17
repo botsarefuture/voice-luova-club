@@ -2531,10 +2531,43 @@ canvas {
 .admin-academy-grid ol { display: grid; gap: 7px; margin: 14px 0 0; padding: 0; list-style: none; }
 .admin-academy-grid li button { width: 100%; display: grid; gap: 3px; padding: 10px; border-left: 3px solid #218e7e; text-align: left; }
 .admin-academy-grid li span { color: #68736d; font-size: .82rem; }
-.admin-academy-editor { display: grid; gap: 14px; }
+.admin-academy-editor { display: grid; gap: 18px; }
 .admin-academy-editor label { display: grid; gap: 6px; font-weight: 740; }
-.admin-academy-editor textarea { width: 100%; border: 1px solid rgba(35,38,34,.25); border-radius: 6px; padding: 10px; background: #fff; font: 0.84rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; }
-.admin-academy-editor label + label textarea { font-family: inherit; }
+.admin-academy-editor input, .admin-academy-editor textarea, .admin-academy-editor select { width: 100%; border: 1px solid rgba(35,38,34,.25); border-radius: 6px; padding: 10px; background: #fff; font: inherit; }
+.admin-academy-editor textarea { resize: vertical; }
+.admin-reference-select { display: grid; gap: 5px; margin-top: 14px; color: #48534d; font-size: .84rem; font-weight: 720; }
+.admin-reference-select select { width: 100%; }
+.admin-empty-authoring { display: grid; gap: 10px; min-height: 260px; align-content: center; }
+.admin-empty-authoring h3, .admin-empty-authoring p { margin: 0; }
+.admin-empty-authoring p { max-width: 52ch; color: #59645e; line-height: 1.5; }
+.admin-form-section { display: grid; gap: 14px; border-top: 1px solid rgba(35,38,34,.14); padding-top: 18px; }
+.admin-form-section h3, .admin-form-section p { margin: 0; }
+.admin-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
+.admin-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.admin-field { min-width: 0; }
+.admin-field-wide { grid-column: 1 / -1; }
+.field-hint { color: #68736d; font-size: .78rem; font-weight: 500; line-height: 1.35; }
+.admin-form-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.admin-form-columns fieldset, .admin-repeater fieldset { display: grid; gap: 10px; min-width: 0; border: 1px solid rgba(35,38,34,.16); border-radius: 6px; padding: 12px; }
+.admin-form-columns legend, .admin-repeater legend { padding: 0 5px; color: #59645e; font-size: .83rem; font-weight: 760; }
+.admin-repeater { display: grid; gap: 12px; }
+.text-action { display: inline-flex; align-items: center; gap: 6px; width: max-content; padding: 7px 0; border: 0; background: transparent; font: inherit; font-weight: 750; cursor: pointer; }
+.text-action svg { width: 15px; height: 15px; }
+.inline-select { display: grid; min-width: 190px; gap: 5px; color: #48534d; font-size: .84rem; font-weight: 720; }
+.admin-block-list { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.admin-block-list > li { border: 1px solid rgba(35,38,34,.16); border-left: 3px solid #218e7e; border-radius: 6px; padding: 12px; }
+.admin-block-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.admin-block-toolbar small { display: block; margin-top: 2px; color: #68736d; }
+.admin-block-toolbar > div { display: flex; gap: 5px; }
+.admin-block-form { display: grid; gap: 13px; margin-top: 13px; }
+.admin-block-guidance { border-top: 1px solid rgba(35,38,34,.13); padding-top: 11px; }
+.admin-block-guidance summary, .admin-advanced-json summary { cursor: pointer; color: #17665b; font-weight: 760; }
+.admin-block-guidance .admin-form-columns { margin-top: 12px; }
+.admin-quiz-option { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+.admin-quiz-option .text-action { grid-column: 1 / -1; }
+.admin-advanced-json { display: grid; gap: 10px; border-top: 1px solid rgba(35,38,34,.14); padding-top: 14px; }
+.admin-advanced-json p { margin: 0; color: #59645e; line-height: 1.4; }
+.admin-advanced-json textarea { font: .82rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .admin-validation { display: flex; gap: 8px; margin: 0; color: #9d314f; line-height: 1.4; }
 .admin-validation.valid { color: #17665b; }
 .admin-blocks { border-top: 1px solid rgba(35,38,34,.14); padding-top: 14px; }
@@ -2548,7 +2581,7 @@ canvas {
 .admin-course-editor p:last-child { margin-top: 7px; color: #59645e; line-height: 1.45; }
 .admin-course-editor > div:last-child { display: grid; justify-items: start; gap: 10px; }
 .admin-course-editor textarea { width: 100%; padding: 10px; border: 1px solid rgba(35,38,34,.25); border-radius: 6px; font: .84rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
-@media (max-width: 760px) { .admin-academy-page { width: min(100% - 24px, 1180px); } .admin-academy-grid { grid-template-columns: 1fr; } .admin-academy-actions { align-items: stretch; flex-direction: column; } }
+@media (max-width: 760px) { .admin-academy-page { width: min(100% - 24px, 1180px); } .admin-academy-grid, .admin-form-grid, .admin-form-columns { grid-template-columns: 1fr; } .admin-academy-actions { align-items: stretch; flex-direction: column; } .admin-section-heading { align-items: stretch; flex-direction: column; } .inline-select { width: 100%; } .admin-block-toolbar { align-items: start; } .admin-quiz-option { grid-template-columns: 1fr; } }
 .academy-sync-control { display: grid; gap: 8px; align-content: center; }
 .academy-sync-control small { max-width: 48ch; color: #59645e; line-height: 1.4; }
 .academy-empty { display: grid; justify-items: start; gap: 12px; }
