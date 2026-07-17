@@ -7,7 +7,7 @@ import { BLOCK_TYPES, getBlockDefinition } from "../src/academy/blockRegistry.js
 import { LESSON_PLAYER_PREVIEW } from "../src/academy/content/lessonPlayerPreview.js";
 import { FOUNDATIONS_LESSONS, getFoundationsLesson } from "../src/academy/content/foundations.js";
 import { advanceLessonProgress, canCompleteBlock, createLessonProgress, createLessonResumeStore, moveLessonProgress } from "../src/academy/lessonProgress.js";
-import { addAcademyJournalEntry, clearAcademyHistory, createAcademyHistory, loadAcademyHistory, recordLessonActivity, saveAcademyHistory, summarizeAcademyHistory } from "../src/academy/learnerHistory.js";
+import { addAcademyJournalEntry, clearAcademyHistory, createAcademyHistory, loadAcademyHistory, mergeAcademyHistories, recordLessonActivity, saveAcademyHistory, summarizeAcademyHistory } from "../src/academy/learnerHistory.js";
 import { LESSON_SCHEMA_VERSION, lessonDuration, validateLesson } from "../src/academy/schema.js";
 
 test("lesson fixture validates against the current versioned schema", () => {
@@ -233,6 +233,19 @@ test("a revised lesson does not inherit completion from an earlier version", () 
   assert.equal(revised.lessons["lesson-a"].lessonVersion, 2);
   assert.equal(revised.lessons["lesson-a"].completed, false);
   assert.equal(revised.lessons["lesson-a"].completionPercentage, 0);
+});
+
+test("Academy history merge is deterministic and preserves independent sessions and notes", () => {
+  const lesson = { id: "lesson-a", slug: "lesson-a", version: 1, title: "A gentle lesson" };
+  const progress = { totalBlocks: 1, currentBlock: 1, completedBlockIds: ["one"], completionPercentage: 100, isComplete: true };
+  const first = addAcademyJournalEntry(recordLessonActivity(createAcademyHistory(), { courseSlug: "foundations", lesson, progress, sessionId: "phone", activeSeconds: 40, now: "2026-07-17T10:00:00.000Z" }), { note: "Phone note", courseSlug: "foundations", now: "2026-07-17T10:00:00.000Z" });
+  const second = addAcademyJournalEntry(recordLessonActivity(createAcademyHistory(), { courseSlug: "foundations", lesson, progress, sessionId: "laptop", activeSeconds: 60, now: "2026-07-17T11:00:00.000Z" }), { note: "Laptop note", courseSlug: "foundations", now: "2026-07-17T11:00:00.000Z" });
+  const merged = mergeAcademyHistories(first, second);
+
+  assert.equal(merged.sessions.length, 2);
+  assert.equal(merged.journal.length, 2);
+  assert.equal(merged.lessons[lesson.id].completed, true);
+  assert.deepEqual(mergeAcademyHistories(first, second), mergeAcademyHistories(second, first));
 });
 
 test("every registered block has a renderable accessible player surface", async (t) => {

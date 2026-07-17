@@ -2,7 +2,7 @@ import { useState } from "react";
 import { CalendarDays, Clock3, Download, FileText, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import { summarizeAcademyHistory } from "./learnerHistory";
 
-export default function AcademyHistory({ history, course, onDeleteHistory, onAddJournal }) {
+export default function AcademyHistory({ history, course, syncEnabled, onDeleteHistory, onAddJournal }) {
   const [note, setNote] = useState("");
   const [ease, setEase] = useState("");
   const summary = summarizeAcademyHistory(history, course.slug, course.lessons);
@@ -58,7 +58,7 @@ export default function AcademyHistory({ history, course, onDeleteHistory, onAdd
 
     <aside className="academy-history-privacy" aria-label="Academy history privacy">
       <ShieldCheck aria-hidden="true" />
-      <div><strong>Saved on this device</strong><p>Academy history does not leave this device. Account sync is a separate, future choice; it is not enabled or collected here.</p></div>
+      <div><strong>{syncEnabled ? "Saved on this device and synced privately" : "Saved on this device"}</strong><p>{syncEnabled ? "Your Academy history is also in your signed-in FemmeVoice account. Turn sync off in Settings to delete that account copy while keeping this device copy." : "Academy history does not leave this device unless you explicitly enable account sync in Settings."}</p></div>
       <div className="academy-history-actions">
         <button type="button" className="icon-action" onClick={exportLocalHistory} aria-label="Export Academy history"><Download /></button>
         <button type="button" className="icon-action danger-action" onClick={deleteHistory} aria-label="Delete Academy history"><Trash2 /></button>
